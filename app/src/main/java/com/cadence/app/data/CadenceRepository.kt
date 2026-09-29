@@ -35,11 +35,19 @@ class CadenceRepository(private val db: CadenceDatabase) {
         db.taskDao().upsert(task.copy(done = nowDone, doneAt = if (nowDone) System.currentTimeMillis() else null))
     }
 
-    suspend fun upsertHabit(habit: HabitEntity) = db.habitDao().upsert(habit)
-    suspend fun upsertRoutine(routine: RoutineEntity) = db.routineDao().upsert(routine)
-    suspend fun upsertTask(task: TaskEntity) = db.taskDao().upsert(task)
+    suspend fun upsertHabit(habit: HabitEntity): Long = db.habitDao().upsert(habit)
+    suspend fun upsertRoutine(routine: RoutineEntity): Long = db.routineDao().upsert(routine)
+    suspend fun upsertTask(task: TaskEntity): Long = db.taskDao().upsert(task)
+    suspend fun upsertHabitLog(log: HabitLogEntity) = db.habitLogDao().upsert(log)
+    suspend fun upsertRoutineLog(log: RoutineLogEntity) = db.routineLogDao().upsert(log)
 
     suspend fun deleteHabit(id: Long) = db.habitDao().deleteById(id)
     suspend fun deleteRoutine(id: Long) = db.routineDao().deleteById(id)
     suspend fun deleteTask(id: Long) = db.taskDao().deleteById(id)
+
+    suspend fun allHabits(): List<HabitEntity> = db.habitDao().allOnce()
+    suspend fun allRoutines(): List<RoutineEntity> = db.routineDao().allOnce()
+    suspend fun allTasks(): List<TaskEntity> = db.taskDao().allOnce()
+    suspend fun allHabitLogs(): List<HabitLogEntity> = db.habitLogDao().allOnce()
+    suspend fun allRoutineLogs(): List<RoutineLogEntity> = db.routineLogDao().allOnce()
 }

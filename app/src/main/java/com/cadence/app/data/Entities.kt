@@ -9,6 +9,7 @@ data class HabitEntity(
     val name: String,
     val daysMask: Int = 127, // Mon=1 .. Sun=64, default every day
     val timeOfDay: String = "ANYTIME", // MORNING / AFTERNOON / EVENING / ANYTIME
+    val reminderMin: Int = -1, // minutes since midnight, -1 = no reminder
     val createdAt: Long = System.currentTimeMillis(),
     val archived: Boolean = false
 )
@@ -27,6 +28,7 @@ data class RoutineEntity(
     val steps: String = "", // one step per line
     val daysMask: Int = 127,
     val timeOfDay: String = "MORNING",
+    val reminderMin: Int = -1,
     val createdAt: Long = System.currentTimeMillis(),
     val archived: Boolean = false
 )
@@ -45,5 +47,6 @@ data class TaskEntity(
     val date: Long, // epochDay
     val priority: String = "NORMAL", // LOW / NORMAL / HIGH
     val done: Boolean = false,
+    val reminderMin: Int = -1,
     val doneAt: Long? = null
 )

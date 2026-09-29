@@ -13,7 +13,7 @@ import androidx.room.RoomDatabase
         RoutineLogEntity::class,
         TaskEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class CadenceDatabase : RoomDatabase() {
@@ -33,7 +33,10 @@ abstract class CadenceDatabase : RoomDatabase() {
                     context.applicationContext,
                     CadenceDatabase::class.java,
                     "cadence.db"
-                ).build().also { instance = it }
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
+                    .also { instance = it }
             }
     }
 }
