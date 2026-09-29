@@ -2,7 +2,11 @@ package com.cadence.app.ui.today
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,12 +22,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,18 +39,25 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cadence.app.modes.ModesManager
 import com.cadence.app.ui.EditorState
@@ -54,35 +68,55 @@ import com.cadence.app.ui.components.CadenceMenu
 import com.cadence.app.ui.components.CadenceSheet
 import com.cadence.app.ui.components.HabitCard
 import com.cadence.app.ui.components.ItemActionsSheet
-import com.cadence.app.ui.components.KadiePod
 import com.cadence.app.ui.components.MenuEntry
 import com.cadence.app.ui.components.RoutineCard
 import com.cadence.app.ui.components.TaskCard
 import com.cadence.app.ui.kadie.Kadie
+import com.cadence.app.ui.kadie.KadieCommandSheet
 import com.cadence.app.ui.kadie.KadieMood
 import com.cadence.app.ui.theme.CardWhite
 import com.cadence.app.ui.theme.Faint
 import com.cadence.app.ui.theme.Forest
 import com.cadence.app.ui.theme.Ink
 import com.cadence.app.ui.theme.Leaf
-import com.cadence.app.ui.theme.Mist
+import com.cadence.app.ui.theme.Matcha
 import com.cadence.app.ui.theme.Paper
-import java.time.DayOfWeek
+import com.cadence.app.ui.theme.Pistachio
+import kotlinx.coroutines.delay
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private val SECTION_ORDER = listOf("MORNING", "AFTERNOON", "EVENING", "ANYTIME")
 
+private val NOTHING_PHRASES = listOf(
+    "Nothing's planned for today.",
+    "A blank page. Nice.",
+    "Your day is wide open.",
+    "Room to breathe today.",
+    "No plans. Pure space.",
+    "Today is unwritten.",
+)
+
+private val ALLDONE_PHRASES = listOf(
+    "All done. Kadie is thrilled.",
+    "Everything checked off.",
+    "A perfect sweep.",
+    "You did the thing. All of it.",
+    "Day complete. Savor it.",
+)
+
 @Composable
 fun TodayScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val vm: TodayViewModel = viewModel(factory = TodayViewModel.factory(context))
     val state by vm.state.collectAsState()
+    val overdue by vm.overdueCount.collectAsState()
     val backupStatus by vm.backupStatus.collectAsState()
     var editing by remember { mutableStateOf<EditorState?>(null) }
     var showEditor by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
+    var showKadie by remember { mutableStateOf(false) }
     var actionsFor by remember { mutableStateOf<TodayItem?>(null) }
 
     val exportLauncher = rememberLauncherForActivityResult(
@@ -91,6 +125,15 @@ fun TodayScreen(modifier: Modifier = Modifier) {
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri -> uri?.let { vm.importBackup(it) } }
+
+    val forceSleep = ModesManager.activeModeName(context) == "Bedtime"
+    val kadieMood = when {
+        forceSleep -> KadieMood.SLEEP
+        state.totalCount == 0 && overdue == 0 -> KadieMood.IDLE
+        overdue > 0 -> KadieMood.FROWN
+        state.doneCount >= state.totalCount -> KadieMood.HAPPY
+        else -> KadieMood.EXCITED
+    }
 
     Scaffold(
         modifier = modifier,
@@ -120,17 +163,28 @@ fun TodayScreen(modifier: Modifier = Modifier) {
                     onAbout = { showAbout = true },
                 )
             }
-            item { WeekStrip(today = state.date) }
             item {
-                KadieSection(
+                HeroRow(
+                    mood = kadieMood,
                     done = state.doneCount,
                     total = state.totalCount,
-                    forceSleep = ModesManager.activeModeName(context) == "Bedtime",
+                    overdue = overdue,
+                    onKadieTap = { showKadie = true },
                 )
             }
 
             if (state.items.isEmpty()) {
-                item { EmptyState() }
+                item {
+                    Text(
+                        "Tap + to plan your first moment - or tap Kadie and say the word.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Faint,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 28.dp),
+                    )
+                }
             }
 
             SECTION_ORDER.forEach { section ->
@@ -193,6 +247,10 @@ fun TodayScreen(modifier: Modifier = Modifier) {
         )
     }
 
+    if (showKadie) {
+        KadieCommandSheet(onDismiss = { showKadie = false })
+    }
+
     actionsFor?.let { item ->
         ItemActionsSheet(
             name = when (item) {
@@ -221,12 +279,12 @@ fun TodayScreen(modifier: Modifier = Modifier) {
     if (showAbout) {
         CadenceSheet(
             onDismiss = { showAbout = false },
-            label = "T9",
+            label = "T9.1",
             title = "Cadence",
             subtitle = "Fully offline. Yours alone.",
         ) {
             Text(
-                "Habits, routines, tasks, notes, stats, modes and an app lockout - with a little robot cheering you on.",
+                "Habits, routines, tasks, notes, stats, modes and an app lockout - with a little robot cheering you on. Tap Kadie and give orders.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Ink,
             )
@@ -258,10 +316,14 @@ private fun TopBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
+            // Date: prominent but compact, leaf caps in contrast to the big ink header.
             Text(
-                state.date.format(DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.getDefault())),
-                style = MaterialTheme.typography.bodyMedium,
-                color = Faint,
+                state.date.format(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault()))
+                    .uppercase(Locale.getDefault()),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = Leaf,
+                letterSpacing = 1.6.sp,
             )
             Spacer(Modifier.height(2.dp))
             Text(
@@ -289,38 +351,80 @@ private fun TopBar(
 }
 
 @Composable
-private fun WeekStrip(today: LocalDate) {
-    val monday = today.with(DayOfWeek.MONDAY)
+private fun HeroRow(
+    mood: KadieMood,
+    done: Int,
+    total: Int,
+    overdue: Int,
+    onKadieTap: () -> Unit,
+) {
+    val caption = when (mood) {
+        KadieMood.SLEEP -> "Kadie is sleeping. Shhh."
+        KadieMood.IDLE -> "Kadie is around. Tap to talk."
+        KadieMood.EXCITED -> "Kadie is pumped. Tap to talk."
+        KadieMood.FROWN -> "$overdue overdue. Kadie noticed."
+        KadieMood.HAPPY -> "Kadie is thrilled."
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 18.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        (0..6).forEach { offset ->
-            val day = monday.plusDays(offset.toLong())
-            val isToday = day == today
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    day.format(DateTimeFormatter.ofPattern("EEE", Locale.getDefault())),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (isToday) Ink else Faint,
-                    fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
+        // Kadie's own card, forest like the nav bar.
+        Card(
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = Forest),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            modifier = Modifier
+                .weight(1f)
+                .height(184.dp)
+                .clip(RoundedCornerShape(28.dp))
+                .clickable(onClick = onKadieTap),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Kadie(
+                    mood = mood,
+                    modifier = Modifier.size(112.dp),
+                    lineColor = Paper,
+                    accent = Matcha,
                 )
-                Spacer(Modifier.height(6.dp))
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(if (isToday) Forest else CardWhite),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        day.dayOfMonth.toString(),
-                        color = if (isToday) Color.White else Faint,
-                        fontWeight = if (isToday) FontWeight.Bold else FontWeight.Medium,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    caption,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Paper.copy(alpha = 0.8f),
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+
+        // Companion card: phrases when empty / done, progress ring otherwise.
+        Card(
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = CardWhite),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            modifier = Modifier
+                .weight(1f)
+                .height(184.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(14.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                when {
+                    total == 0 -> RotatingPhrases(phrases = NOTHING_PHRASES, color = Ink)
+                    done >= total -> RotatingPhrases(phrases = ALLDONE_PHRASES, color = Leaf)
+                    else -> ProgressRing(done = done, total = total)
                 }
             }
         }
@@ -328,85 +432,65 @@ private fun WeekStrip(today: LocalDate) {
 }
 
 @Composable
-private fun KadieSection(done: Int, total: Int, forceSleep: Boolean) {
-    val mood = when {
-        forceSleep -> KadieMood.SLEEP
-        total == 0 -> KadieMood.SLEEP
-        done >= total -> KadieMood.HAPPY
-        else -> KadieMood.IDLE
-    }
-    val (headline, subline) = when {
-        forceSleep -> "Bedtime mode" to "Kadie is sleeping. Shhh."
-        mood == KadieMood.HAPPY -> "All clear!" to "Kadie is proud of you."
-        mood == KadieMood.IDLE -> "Keep going" to "Kadie is watching your progress."
-        else -> "Quiet day" to "Kadie is recharging."
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        KadiePod(
-            mood = mood,
-            done = done,
-            total = total,
-            modifier = Modifier.size(124.dp),
-        )
-        Spacer(Modifier.width(16.dp))
-        Column {
-            Text(
-                headline,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = Ink,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "$done of $total done today",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = Leaf,
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                subline,
-                style = MaterialTheme.typography.bodySmall,
-                color = Faint,
-            )
+private fun RotatingPhrases(phrases: List<String>, color: Color) {
+    var index by remember { mutableIntStateOf(0) }
+    LaunchedEffect(phrases) {
+        while (true) {
+            delay(3400)
+            index = (index + 1) % phrases.size
         }
+    }
+    Crossfade(targetState = index, animationSpec = tween(500), label = "phrase") { i ->
+        Text(
+            phrases[i],
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = color,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
 @Composable
-private fun EmptyState() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 40.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(88.dp)
-                .clip(CircleShape)
-                .background(Mist),
-            contentAlignment = Alignment.Center,
-        ) {
-            Kadie(mood = KadieMood.SLEEP, modifier = Modifier.size(52.dp))
+private fun ProgressRing(done: Int, total: Int) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(contentAlignment = Alignment.Center) {
+            Canvas(modifier = Modifier.size(104.dp)) {
+                val stroke = Stroke(width = 9.dp.toPx())
+                val inset = 5.dp.toPx()
+                drawArc(
+                    color = Pistachio,
+                    startAngle = 0f,
+                    sweepAngle = 360f,
+                    useCenter = false,
+                    style = stroke,
+                    topLeft = Offset(inset, inset),
+                    size = Size(size.width - inset * 2, size.height - inset * 2),
+                )
+                drawArc(
+                    color = Leaf,
+                    startAngle = -90f,
+                    sweepAngle = 360f * (done.toFloat() / total.coerceAtLeast(1)),
+                    useCenter = false,
+                    style = stroke,
+                    topLeft = Offset(inset, inset),
+                    size = Size(size.width - inset * 2, size.height - inset * 2),
+                )
+            }
+            Text(
+                "$done/$total",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = Ink,
+            )
         }
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(8.dp))
         Text(
-            "Nothing scheduled",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = Ink,
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            "Tap + to add your first habit, routine or task.",
+            "done today",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
             color = Faint,
-            style = MaterialTheme.typography.bodyMedium,
         )
     }
 }

@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -105,6 +106,11 @@ class TodayViewModel(
     private val todayMask: Int = 1 shl (today.dayOfWeek.value - 1)
 
     val backupStatus = MutableStateFlow<String?>(null)
+
+    // Undone tasks from days before today - Kadie frowns at these.
+    val overdueCount: StateFlow<Int> = repo.tasksBetween(0, todayEpoch - 1)
+        .map { list -> list.count { !it.done } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     val state: StateFlow<TodayUiState> = combine(
         repo.habits,

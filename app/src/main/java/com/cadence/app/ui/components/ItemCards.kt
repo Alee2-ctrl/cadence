@@ -60,6 +60,29 @@ import com.cadence.app.ui.theme.TeaMist
 
 val cardShape = RoundedCornerShape(24.dp)
 
+// Each action type has its own color on the Today screen.
+val HabitColor = Leaf
+val RoutineColor = Honey
+val TaskColor = SkyBlue
+
+@Composable
+fun TypePill(text: String, color: Color) {
+    Box(
+        modifier = Modifier
+            .padding(top = 5.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(color.copy(alpha = 0.16f))
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = color,
+        )
+    }
+}
+
 @Composable
 fun CircleCheckbox(checked: Boolean, accent: Color = Leaf, onClick: () -> Unit) {
     val haptics = LocalHapticFeedback.current
@@ -141,7 +164,7 @@ fun HabitCard(
                     color = if (item.done) Faint else Ink,
                     textDecoration = if (item.done) TextDecoration.LineThrough else null,
                 )
-                Text("Habit", style = MaterialTheme.typography.labelMedium, color = Leaf, fontWeight = FontWeight.SemiBold)
+                TypePill("Habit", HabitColor)
             }
             CircleCheckbox(checked = item.done, accent = Leaf, onClick = onToggle)
         }
@@ -184,11 +207,9 @@ fun RoutineCard(
                         fontWeight = FontWeight.SemiBold,
                         color = Ink,
                     )
-                    Text(
+                    TypePill(
                         "Routine - ${item.doneSteps.count { it in item.steps.indices }}/${item.steps.size} steps",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Honey,
-                        fontWeight = FontWeight.SemiBold,
+                        RoutineColor,
                     )
                 }
                 Icon(
@@ -300,7 +321,7 @@ fun TaskCard(
                     color = if (item.task.done) Faint else Ink,
                     textDecoration = if (item.task.done) TextDecoration.LineThrough else null,
                 )
-                Text("Task", style = MaterialTheme.typography.labelMedium, color = SkyBlue, fontWeight = FontWeight.SemiBold)
+                TypePill("Task", TaskColor)
             }
             CircleCheckbox(checked = item.task.done, accent = SkyBlue, onClick = onToggle)
         }
