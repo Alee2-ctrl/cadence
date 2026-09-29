@@ -11,9 +11,10 @@ import androidx.room.RoomDatabase
         HabitLogEntity::class,
         RoutineEntity::class,
         RoutineLogEntity::class,
-        TaskEntity::class
+        TaskEntity::class,
+        ReviewEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class CadenceDatabase : RoomDatabase() {
@@ -22,6 +23,7 @@ abstract class CadenceDatabase : RoomDatabase() {
     abstract fun routineDao(): RoutineDao
     abstract fun routineLogDao(): RoutineLogDao
     abstract fun taskDao(): TaskDao
+    abstract fun reviewDao(): ReviewDao
 
     companion object {
         @Volatile
