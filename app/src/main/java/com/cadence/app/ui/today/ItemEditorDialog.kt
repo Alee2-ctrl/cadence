@@ -2,21 +2,11 @@ package com.cadence.app.ui.today
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -26,17 +16,19 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cadence.app.ui.EditorState
-import com.cadence.app.ui.theme.CardWhite
+import com.cadence.app.ui.components.CadenceSheet
+import com.cadence.app.ui.components.SheetChipRow
+import com.cadence.app.ui.components.SheetLabel
+import com.cadence.app.ui.components.SheetPillButton
+import com.cadence.app.ui.components.SheetTextField
 import com.cadence.app.ui.theme.Faint
-import com.cadence.app.ui.theme.Ink
-import com.cadence.app.ui.theme.Leaf
-import com.cadence.app.ui.theme.Mist
-import com.cadence.app.ui.theme.Paper
+import com.cadence.app.ui.theme.Red
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -61,88 +53,97 @@ fun ItemEditorDialog(
             if (initial != null && initial.date > 0) initial.date else defaultDate,
         )
     }
+    var confirmDelete by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = Paper,
-        shape = RoundedCornerShape(24.dp),
-        title = {
-            Text(
-                if (initial == null) "Add item" else "Edit",
-                fontWeight = FontWeight.Bold,
-                color = Ink,
+    val headerLabel = when (type) {
+        "HABIT" -> "One step, often"
+        "ROUTINE" -> "Your daily rhythm"
+        else -> "A clear next step"
+    }
+
+    CadenceSheet(
+        onDismiss = onDismiss,
+        label = headerLabel,
+        title = if (initial == null) "Make it happen." else "Tune it up.",
+        subtitle = "Give your plan a name and a place in your day.",
+    ) {
+        Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+            SheetTextField(
+                value = name,
+                onValueChange = { name = it },
+                hint = "What needs doing?",
             )
-        },
-        text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+
+            SheetLabel("Type")
+            SheetChipRow(
+                options = listOf("TASK", "HABIT", "ROUTINE"),
+                selected = type,
+                onSelect = { type = it },
+            )
+
+            if (type == "TASK") {
+                SheetLabel("Priority")
+                SheetChipRow(
+                    options = listOf("LOW", "NORMAL", "HIGH"),
+                    selected = priority,
+                    onSelect = { priority = it },
                 )
-                Spacer(Modifier.height(14.dp))
-
-                ChipRow(
-                    label = "Type",
-                    options = listOf("TASK", "HABIT", "ROUTINE"),
-                    selected = type,
-                    onSelect = { type = it },
+                SheetLabel("Date")
+                SheetChipRow(
+                    options = listOf("DATE"),
+                    selected = "DATE",
+                    onSelect = {
+                        val d = LocalDate.ofEpochDay(dateEpoch)
+                        DatePickerDialog(
+                            context,
+                            { _, year, month, day ->
+                                dateEpoch = LocalDate.of(year, month + 1, day).toEpochDay()
+                            },
+                            d.year,
+                            d.monthValue - 1,
+                            d.dayOfMonth,
+                        ).show()
+                    },
+                    label = {
+                        LocalDate.ofEpochDay(dateEpoch).format(
+                            DateTimeFormatter.ofPattern("EEE, MMM d", Locale.getDefault()),
+                        )
+                    },
                 )
+            } else {
+                SheetLabel("Frequency")
+                SheetChipRow(
+                    options = listOf("DAILY", "WEEKDAYS", "WEEKENDS"),
+                    selected = when (daysMask) {
+                        31 -> "WEEKDAYS"
+                        96 -> "WEEKENDS"
+                        else -> "DAILY"
+                    },
+                    onSelect = {
+                        daysMask = when (it) {
+                            "WEEKDAYS" -> 31
+                            "WEEKENDS" -> 96
+                            else -> 127
+                        }
+                    },
+                )
+                SheetLabel("Time of day")
+                SheetChipRow(
+                    options = listOf("MORNING", "AFTERNOON", "EVENING", "ANYTIME"),
+                    selected = timeOfDay,
+                    onSelect = { timeOfDay = it },
+                )
+            }
 
-                if (type == "TASK") {
-                    ChipRow(
-                        label = "Priority",
-                        options = listOf("LOW", "NORMAL", "HIGH"),
-                        selected = priority,
-                        onSelect = { priority = it },
-                    )
-                    DateRow(
-                        dateEpoch = dateEpoch,
-                        onPick = {
-                            val d = LocalDate.ofEpochDay(dateEpoch)
-                            DatePickerDialog(
-                                context,
-                                { _, year, month, day ->
-                                    dateEpoch = LocalDate.of(year, month + 1, day).toEpochDay()
-                                },
-                                d.year,
-                                d.monthValue - 1,
-                                d.dayOfMonth,
-                            ).show()
-                        },
-                    )
-                } else {
-                    ChipRow(
-                        label = "Frequency",
-                        options = listOf("DAILY", "WEEKDAYS", "WEEKENDS"),
-                        selected = when (daysMask) {
-                            31 -> "WEEKDAYS"
-                            96 -> "WEEKENDS"
-                            else -> "DAILY"
-                        },
-                        onSelect = {
-                            daysMask = when (it) {
-                                "WEEKDAYS" -> 31
-                                "WEEKENDS" -> 96
-                                else -> 127
-                            }
-                        },
-                    )
-                    ChipRow(
-                        label = "Time of day",
-                        options = listOf("MORNING", "AFTERNOON", "EVENING", "ANYTIME"),
-                        selected = timeOfDay,
-                        onSelect = { timeOfDay = it },
-                    )
-                }
-
-                ReminderRow(
-                    reminderMin = reminderMin,
-                    onOff = { reminderMin = -1 },
-                    onPick = {
+            SheetLabel("Reminder")
+            SheetChipRow(
+                options = listOf("OFF", "TIME"),
+                selected = if (reminderMin < 0) "OFF" else "TIME",
+                onSelect = { opt ->
+                    if (opt == "OFF") {
+                        reminderMin = -1
+                    } else {
                         val startMin = if (reminderMin >= 0) reminderMin else 8 * 60
                         TimePickerDialog(
                             context,
@@ -151,23 +152,30 @@ fun ItemEditorDialog(
                             startMin % 60,
                             true,
                         ).show()
-                    },
-                )
+                    }
+                },
+                label = {
+                    if (it == "OFF") "Off"
+                    else if (reminderMin >= 0)
+                        String.format(Locale.getDefault(), "%02d:%02d", reminderMin / 60, reminderMin % 60)
+                    else "Set time"
+                },
+            )
 
-                if (type == "ROUTINE") {
-                    Spacer(Modifier.height(10.dp))
-                    OutlinedTextField(
-                        value = steps,
-                        onValueChange = { steps = it },
-                        label = { Text("Steps (one per line)") },
-                        minLines = 3,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
+            if (type == "ROUTINE") {
+                SheetLabel("Steps")
+                SheetTextField(
+                    value = steps,
+                    onValueChange = { steps = it },
+                    hint = "One step per line",
+                    singleLine = false,
+                    minLines = 3,
+                )
             }
-        },
-        confirmButton = {
-            TextButton(
+
+            Spacer(Modifier.height(20.dp))
+            SheetPillButton(
+                text = if (initial == null) "Add to your day" else "Save changes",
                 onClick = {
                     if (name.isNotBlank()) {
                         onSave(
@@ -186,112 +194,20 @@ fun ItemEditorDialog(
                         )
                     }
                 },
-            ) { Text("Save", color = Leaf, fontWeight = FontWeight.Bold) }
-        },
-        dismissButton = {
-            Row {
-                if (initial != null) {
-                    TextButton(onClick = { onDelete(initial) }) { Text("Delete", color = Faint) }
-                }
-                TextButton(onClick = onDismiss) { Text("Cancel", color = Faint) }
-            }
-        },
-    )
-}
-
-@Composable
-private fun DateRow(dateEpoch: Long, onPick: () -> Unit) {
-    Column(modifier = Modifier.padding(vertical = 4.dp)) {
-        Text("Date", style = MaterialTheme.typography.labelMedium, color = Faint)
-        Spacer(Modifier.height(6.dp))
-        FilterChip(
-            selected = true,
-            onClick = onPick,
-            label = {
-                Text(
-                    LocalDate.ofEpochDay(dateEpoch).format(
-                        DateTimeFormatter.ofPattern("EEE, MMM d", Locale.getDefault()),
-                    ),
-                    style = MaterialTheme.typography.labelMedium,
-                )
-            },
-            colors = FilterChipDefaults.filterChipColors(
-                containerColor = CardWhite,
-                labelColor = Faint,
-                selectedContainerColor = Mist,
-                selectedLabelColor = Ink,
-            ),
-        )
-    }
-}
-
-@Composable
-private fun ReminderRow(reminderMin: Int, onOff: () -> Unit, onPick: () -> Unit) {
-    Column(modifier = Modifier.padding(vertical = 4.dp)) {
-        Text("Reminder", style = MaterialTheme.typography.labelMedium, color = Faint)
-        Spacer(Modifier.height(6.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(
-                selected = reminderMin < 0,
-                onClick = onOff,
-                label = { Text("Off", style = MaterialTheme.typography.labelMedium) },
-                colors = FilterChipDefaults.filterChipColors(
-                    containerColor = CardWhite,
-                    labelColor = Faint,
-                    selectedContainerColor = Mist,
-                    selectedLabelColor = Ink,
-                ),
             )
-            FilterChip(
-                selected = reminderMin >= 0,
-                onClick = onPick,
-                label = {
-                    Text(
-                        if (reminderMin >= 0)
-                            String.format(Locale.getDefault(), "%02d:%02d", reminderMin / 60, reminderMin % 60)
-                        else "Set time",
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                },
-                colors = FilterChipDefaults.filterChipColors(
-                    containerColor = CardWhite,
-                    labelColor = Faint,
-                    selectedContainerColor = Mist,
-                    selectedLabelColor = Leaf,
-                ),
-            )
-        }
-    }
-}
-
-@Composable
-private fun ChipRow(
-    label: String,
-    options: List<String>,
-    selected: String,
-    onSelect: (String) -> Unit,
-) {
-    Column(modifier = Modifier.padding(vertical = 4.dp)) {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = Faint)
-        Spacer(Modifier.height(6.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            options.forEach { option ->
-                FilterChip(
-                    selected = selected == option,
-                    onClick = { onSelect(option) },
-                    label = {
-                        Text(
-                            option.lowercase().replaceFirstChar { it.uppercase() },
-                            style = MaterialTheme.typography.labelMedium,
-                        )
+            if (initial != null) {
+                TextButton(
+                    onClick = {
+                        if (confirmDelete) onDelete(initial) else confirmDelete = true
                     },
-                    colors = FilterChipDefaults.filterChipColors(
-                        containerColor = CardWhite,
-                        labelColor = Faint,
-                        selectedContainerColor = Mist,
-                        selectedLabelColor = Ink,
-                    ),
-                )
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                ) {
+                    Text(
+                        if (confirmDelete) "Tap again to delete" else "Delete",
+                        color = if (confirmDelete) Red else Faint,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
         }
     }

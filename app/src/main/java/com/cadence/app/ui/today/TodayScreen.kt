@@ -18,15 +18,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,7 +42,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -54,11 +50,14 @@ import com.cadence.app.ui.EditorState
 import com.cadence.app.ui.TodayItem
 import com.cadence.app.ui.TodayUiState
 import com.cadence.app.ui.TodayViewModel
+import com.cadence.app.ui.components.CadenceMenu
+import com.cadence.app.ui.components.CadenceSheet
 import com.cadence.app.ui.components.HabitCard
+import com.cadence.app.ui.components.ItemActionsSheet
 import com.cadence.app.ui.components.KadiePod
+import com.cadence.app.ui.components.MenuEntry
 import com.cadence.app.ui.components.RoutineCard
 import com.cadence.app.ui.components.TaskCard
-import com.cadence.app.ui.components.cardShape
 import com.cadence.app.ui.kadie.Kadie
 import com.cadence.app.ui.kadie.KadieMood
 import com.cadence.app.ui.theme.CardWhite
@@ -68,7 +67,6 @@ import com.cadence.app.ui.theme.Ink
 import com.cadence.app.ui.theme.Leaf
 import com.cadence.app.ui.theme.Mist
 import com.cadence.app.ui.theme.Paper
-import com.cadence.app.ui.theme.Pistachio
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -85,6 +83,7 @@ fun TodayScreen(modifier: Modifier = Modifier) {
     var editing by remember { mutableStateOf<EditorState?>(null) }
     var showEditor by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
+    var actionsFor by remember { mutableStateOf<TodayItem?>(null) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
@@ -122,7 +121,6 @@ fun TodayScreen(modifier: Modifier = Modifier) {
                 )
             }
             item { WeekStrip(today = state.date) }
-            item { QuoteBanner(quote = Quotes.forToday()) }
             item {
                 KadieSection(
                     done = state.doneCount,
@@ -162,6 +160,7 @@ fun TodayScreen(modifier: Modifier = Modifier) {
                             item = item,
                             onToggle = { vm.toggleHabit(item.habit.id, !item.done) },
                             onEdit = { editing = EditorState.from(item); showEditor = true },
+                            onLongPress = { actionsFor = item },
                         )
                         is TodayItem.Routine -> RoutineCard(
                             item = item,
@@ -169,11 +168,13 @@ fun TodayScreen(modifier: Modifier = Modifier) {
                                 vm.toggleRoutineStep(item.routine.id, idx, done, item.doneSteps)
                             },
                             onEdit = { editing = EditorState.from(item); showEditor = true },
+                            onLongPress = { actionsFor = item },
                         )
                         is TodayItem.Task -> TaskCard(
                             item = item,
                             onToggle = { vm.toggleTask(item.task) },
                             onEdit = { editing = EditorState.from(item); showEditor = true },
+                            onLongPress = { actionsFor = item },
                         )
                     }
                     Spacer(Modifier.height(10.dp))
@@ -192,29 +193,53 @@ fun TodayScreen(modifier: Modifier = Modifier) {
         )
     }
 
-    if (showAbout) {
-        AlertDialog(
-            onDismissRequest = { showAbout = false },
-            containerColor = Paper,
-            shape = RoundedCornerShape(24.dp),
-            title = { Text("Cadence - T8", fontWeight = FontWeight.Bold, color = Ink) },
-            text = {
-                Column {
-                    Text(
-                        "Habits, routines, tasks, notes, stats, modes and an app lockout - with a little robot cheering you on. Fully offline.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Ink,
-                    )
-                    backupStatus?.let {
-                        Spacer(Modifier.height(10.dp))
-                        Text(it, style = MaterialTheme.typography.bodySmall, color = Faint)
-                    }
-                }
+    actionsFor?.let { item ->
+        ItemActionsSheet(
+            name = when (item) {
+                is TodayItem.Habit -> item.habit.name
+                is TodayItem.Routine -> item.routine.name
+                is TodayItem.Task -> item.task.title
             },
-            confirmButton = {
-                TextButton(onClick = { showAbout = false }) { Text("Close", color = Faint) }
+            kind = when (item) {
+                is TodayItem.Habit -> "Habit"
+                is TodayItem.Routine -> "Routine"
+                is TodayItem.Task -> "Task"
             },
+            onEdit = {
+                editing = EditorState.from(item)
+                actionsFor = null
+                showEditor = true
+            },
+            onDelete = {
+                vm.delete(EditorState.from(item))
+                actionsFor = null
+            },
+            onDismiss = { actionsFor = null },
         )
+    }
+
+    if (showAbout) {
+        CadenceSheet(
+            onDismiss = { showAbout = false },
+            label = "T9",
+            title = "Cadence",
+            subtitle = "Fully offline. Yours alone.",
+        ) {
+            Text(
+                "Habits, routines, tasks, notes, stats, modes and an app lockout - with a little robot cheering you on.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Ink,
+            )
+            backupStatus?.let {
+                Spacer(Modifier.height(10.dp))
+                Text(it, style = MaterialTheme.typography.bodySmall, color = Faint)
+            }
+            Spacer(Modifier.height(14.dp))
+            TextButton(
+                onClick = { showAbout = false },
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            ) { Text("Close", color = Faint, fontWeight = FontWeight.SemiBold) }
+        }
     }
 }
 
@@ -250,24 +275,15 @@ private fun TopBar(
             IconButton(onClick = { menuOpen = true }) {
                 Icon(Icons.Filled.MoreVert, contentDescription = "Menu", tint = Faint)
             }
-            DropdownMenu(
+            CadenceMenu(
                 expanded = menuOpen,
-                onDismissRequest = { menuOpen = false },
-                containerColor = CardWhite,
-            ) {
-                DropdownMenuItem(
-                    text = { Text("Export backup") },
-                    onClick = { menuOpen = false; onExport() },
-                )
-                DropdownMenuItem(
-                    text = { Text("Import backup") },
-                    onClick = { menuOpen = false; onImport() },
-                )
-                DropdownMenuItem(
-                    text = { Text("About Cadence") },
-                    onClick = { menuOpen = false; onAbout() },
-                )
-            }
+                onDismiss = { menuOpen = false },
+                entries = listOf(
+                    MenuEntry(Icons.Outlined.Share, "Export backup", onExport),
+                    MenuEntry(Icons.Outlined.KeyboardArrowDown, "Import backup", onImport),
+                    MenuEntry(Icons.Outlined.Info, "About Cadence", onAbout),
+                ),
+            )
         }
     }
 }
@@ -307,34 +323,6 @@ private fun WeekStrip(today: LocalDate) {
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun QuoteBanner(quote: String) {
-    Card(
-        shape = cardShape,
-        colors = CardDefaults.cardColors(containerColor = Pistachio),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 18.dp),
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
-            Text(
-                "Daily spark",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = Leaf,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                quote,
-                style = MaterialTheme.typography.bodyMedium,
-                fontStyle = FontStyle.Italic,
-                color = Ink,
-            )
         }
     }
 }
