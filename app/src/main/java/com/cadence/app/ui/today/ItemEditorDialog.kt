@@ -30,11 +30,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cadence.app.ui.EditorState
 import com.cadence.app.ui.theme.CardWhite
-import com.cadence.app.ui.theme.Clay
 import com.cadence.app.ui.theme.Faint
 import com.cadence.app.ui.theme.Ink
+import com.cadence.app.ui.theme.Leaf
+import com.cadence.app.ui.theme.Mist
 import com.cadence.app.ui.theme.Paper
-import com.cadence.app.ui.theme.Soft
 import java.util.Locale
 
 @Composable
@@ -161,7 +161,7 @@ fun ItemEditorDialog(
                         )
                     }
                 },
-            ) { Text("Save", color = Clay, fontWeight = FontWeight.Bold) }
+            ) { Text("Save", color = Leaf, fontWeight = FontWeight.Bold) }
         },
         dismissButton = {
             Row {
@@ -187,7 +187,7 @@ private fun ReminderRow(reminderMin: Int, onOff: () -> Unit, onPick: () -> Unit)
                 colors = FilterChipDefaults.filterChipColors(
                     containerColor = CardWhite,
                     labelColor = Faint,
-                    selectedContainerColor = Soft,
+                    selectedContainerColor = Mist,
                     selectedLabelColor = Ink,
                 ),
             )
@@ -205,8 +205,8 @@ private fun ReminderRow(reminderMin: Int, onOff: () -> Unit, onPick: () -> Unit)
                 colors = FilterChipDefaults.filterChipColors(
                     containerColor = CardWhite,
                     labelColor = Faint,
-                    selectedContainerColor = Soft,
-                    selectedLabelColor = Clay,
+                    selectedContainerColor = Mist,
+                    selectedLabelColor = Leaf,
                 ),
             )
         }
@@ -237,7 +237,7 @@ private fun ChipRow(
                     colors = FilterChipDefaults.filterChipColors(
                         containerColor = CardWhite,
                         labelColor = Faint,
-                        selectedContainerColor = Soft,
+                        selectedContainerColor = Mist,
                         selectedLabelColor = Ink,
                     ),
                 )

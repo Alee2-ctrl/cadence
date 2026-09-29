@@ -25,9 +25,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.cadence.app.ui.theme.Clay
 import com.cadence.app.ui.theme.Faint
 import com.cadence.app.ui.theme.Ink
+import com.cadence.app.ui.theme.Leaf
 import com.cadence.app.ui.theme.Paper
 import com.cadence.app.ui.today.TodayScreen
 
@@ -54,7 +54,7 @@ fun CadenceRoot() {
                         icon = { Icon(tab.icon, contentDescription = tab.label) },
                         label = { Text(tab.label) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Clay,
+                            selectedIconColor = Leaf,
                             selectedTextColor = Ink,
                             unselectedIconColor = Faint,
                             unselectedTextColor = Faint,

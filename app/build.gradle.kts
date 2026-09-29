@@ -13,8 +13,8 @@ android {
         applicationId = "com.cadence.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "0.2"
+        versionCode = 3
+        versionName = "0.3"
     }
 
     buildTypes {
@@ -34,6 +34,28 @@ android {
         compose = true
     }
 }
+
+// Poppins is bundled at build time so the app stays 100% offline.
+val downloadFonts by registering {
+    onlyIf { !file("src/main/res/font/poppins_regular.ttf").exists() }
+    doLast {
+        val dir = file("src/main/res/font").apply { mkdirs() }
+        mapOf(
+            "poppins_regular.ttf" to "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Regular.ttf",
+            "poppins_medium.ttf" to "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Medium.ttf",
+            "poppins_semibold.ttf" to "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-SemiBold.ttf",
+            "poppins_bold.ttf" to "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Bold.ttf",
+        ).forEach { (name, url) ->
+            val target = File(dir, name)
+            if (!target.exists()) {
+                java.net.URI(url).toURL().openStream().use { input ->
+                    target.outputStream().use { output -> input.copyTo(output) }
+                }
+            }
+        }
+    }
+}
+tasks.named("preBuild") { dependsOn(downloadFonts) }
 
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.09.00")
