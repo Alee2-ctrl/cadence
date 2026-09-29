@@ -57,3 +57,34 @@ data class ReviewEntity(
     val mood: String = "", // GREAT / OKAY / TOUGH
     val note: String = ""
 )
+
+@Entity(tableName = "notes")
+data class NoteEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val title: String = "",
+    val text: String = "",
+    val colorKey: String = "paper",
+    val isChecklist: Boolean = false,
+    val pinned: Boolean = false,
+    val updatedAt: Long = System.currentTimeMillis(),
+)
+
+@Entity(tableName = "modes")
+data class ModeEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val colorKey: String = "leaf",
+    val dnd: Boolean = true,
+    val blocklist: Boolean = false,
+    val createdAt: Long = System.currentTimeMillis(),
+)
+
+@Entity(tableName = "lockout")
+data class LockoutEntity(
+    @PrimaryKey val id: Long = 1,
+    val enabled: Boolean = false,
+    val startMin: Int = 21 * 60,
+    val endMin: Int = 8 * 60,
+    val reason: String = "",
+    val blockedPackages: String = "", // comma separated package names
+)
