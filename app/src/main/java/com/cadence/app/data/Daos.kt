@@ -27,6 +27,9 @@ interface HabitLogDao {
     @Query("SELECT * FROM habit_logs WHERE date = :date")
     fun forDate(date: Long): Flow<List<HabitLogEntity>>
 
+    @Query("SELECT * FROM habit_logs WHERE date BETWEEN :fromDate AND :toDate")
+    fun between(fromDate: Long, toDate: Long): Flow<List<HabitLogEntity>>
+
     @Upsert
     suspend fun upsert(log: HabitLogEntity)
 
@@ -57,6 +60,9 @@ interface RoutineLogDao {
     @Query("SELECT * FROM routine_logs WHERE date = :date")
     fun forDate(date: Long): Flow<List<RoutineLogEntity>>
 
+    @Query("SELECT * FROM routine_logs WHERE date BETWEEN :fromDate AND :toDate")
+    fun between(fromDate: Long, toDate: Long): Flow<List<RoutineLogEntity>>
+
     @Upsert
     suspend fun upsert(log: RoutineLogEntity)
 
@@ -80,4 +86,16 @@ interface TaskDao {
 
     @Query("SELECT * FROM tasks")
     suspend fun allOnce(): List<TaskEntity>
+}
+
+@Dao
+interface ReviewDao {
+    @Query("SELECT * FROM reviews WHERE date = :date")
+    fun forDate(date: Long): Flow<ReviewEntity?>
+
+    @Upsert
+    suspend fun upsert(review: ReviewEntity)
+
+    @Query("SELECT * FROM reviews")
+    suspend fun allOnce(): List<ReviewEntity>
 }
