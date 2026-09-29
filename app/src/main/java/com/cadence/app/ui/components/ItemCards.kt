@@ -53,12 +53,13 @@ import com.cadence.app.ui.theme.Honey
 import com.cadence.app.ui.theme.Ink
 import com.cadence.app.ui.theme.Leaf
 import com.cadence.app.ui.theme.Mist
+import com.cadence.app.ui.theme.Radius
 import com.cadence.app.ui.theme.Red
 import com.cadence.app.ui.theme.SageDone
 import com.cadence.app.ui.theme.SkyBlue
 import com.cadence.app.ui.theme.TeaMist
 
-val cardShape = RoundedCornerShape(24.dp)
+val cardShape = RoundedCornerShape(Radius.Card)
 
 // Each action type has its own color on the Today screen.
 val HabitColor = Leaf

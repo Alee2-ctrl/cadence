@@ -52,6 +52,7 @@ import com.cadence.app.ui.theme.Ink
 import com.cadence.app.ui.theme.Matcha
 import com.cadence.app.ui.theme.Paper
 import com.cadence.app.ui.theme.Red
+import com.cadence.app.ui.theme.Surface
 import com.cadence.app.ui.theme.TeaMist
 
 // T9.0 shared design system: every dialog in the app is a paper sheet with a
@@ -68,7 +69,7 @@ fun CadenceSheet(
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = Paper,
+        containerColor = Surface,
         dragHandle = { BottomSheetDefaults.DragHandle(color = TeaMist) },
     ) {
         Column(
