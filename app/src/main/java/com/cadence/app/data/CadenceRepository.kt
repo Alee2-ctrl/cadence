@@ -12,6 +12,11 @@ class CadenceRepository(private val db: CadenceDatabase) {
     fun tasksFor(date: Long): Flow<List<TaskEntity>> = db.taskDao().forDate(date)
     fun tasksBetween(fromDate: Long, toDate: Long): Flow<List<TaskEntity>> =
         db.taskDao().between(fromDate, toDate)
+    fun habitLogsBetween(fromDate: Long, toDate: Long): Flow<List<HabitLogEntity>> =
+        db.habitLogDao().between(fromDate, toDate)
+    fun routineLogsBetween(fromDate: Long, toDate: Long): Flow<List<RoutineLogEntity>> =
+        db.routineLogDao().between(fromDate, toDate)
+    fun reviewFor(date: Long): Flow<ReviewEntity?> = db.reviewDao().forDate(date)
 
     suspend fun toggleHabit(habitId: Long, date: Long, done: Boolean) {
         if (done) {
@@ -42,6 +47,7 @@ class CadenceRepository(private val db: CadenceDatabase) {
     suspend fun upsertTask(task: TaskEntity): Long = db.taskDao().upsert(task)
     suspend fun upsertHabitLog(log: HabitLogEntity) = db.habitLogDao().upsert(log)
     suspend fun upsertRoutineLog(log: RoutineLogEntity) = db.routineLogDao().upsert(log)
+    suspend fun upsertReview(review: ReviewEntity) = db.reviewDao().upsert(review)
 
     suspend fun deleteHabit(id: Long) = db.habitDao().deleteById(id)
     suspend fun deleteRoutine(id: Long) = db.routineDao().deleteById(id)
@@ -52,4 +58,5 @@ class CadenceRepository(private val db: CadenceDatabase) {
     suspend fun allTasks(): List<TaskEntity> = db.taskDao().allOnce()
     suspend fun allHabitLogs(): List<HabitLogEntity> = db.habitLogDao().allOnce()
     suspend fun allRoutineLogs(): List<RoutineLogEntity> = db.routineLogDao().allOnce()
+    suspend fun allReviews(): List<ReviewEntity> = db.reviewDao().allOnce()
 }
