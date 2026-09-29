@@ -3,9 +3,11 @@ package com.cadence.app.ui.today
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -25,10 +27,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,8 +52,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -57,16 +65,22 @@ import com.cadence.app.ui.EditorState
 import com.cadence.app.ui.TodayItem
 import com.cadence.app.ui.TodayUiState
 import com.cadence.app.ui.TodayViewModel
-import com.cadence.app.ui.theme.Butter
+import com.cadence.app.ui.kadie.Kadie
+import com.cadence.app.ui.kadie.KadieMood
+import com.cadence.app.ui.theme.Bamboo
 import com.cadence.app.ui.theme.CardWhite
-import com.cadence.app.ui.theme.Clay
 import com.cadence.app.ui.theme.Faint
+import com.cadence.app.ui.theme.Forest
 import com.cadence.app.ui.theme.Ink
-import com.cadence.app.ui.theme.Lilac
+import com.cadence.app.ui.theme.Leaf
+import com.cadence.app.ui.theme.Matcha
+import com.cadence.app.ui.theme.Mist
 import com.cadence.app.ui.theme.Paper
-import com.cadence.app.ui.theme.Sage
-import com.cadence.app.ui.theme.Soft
-import com.cadence.app.ui.theme.Stone
+import com.cadence.app.ui.theme.Pistachio
+import com.cadence.app.ui.theme.SageDone
+import com.cadence.app.ui.theme.TeaMist
+import java.time.DayOfWeek
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -80,7 +94,7 @@ fun TodayScreen(modifier: Modifier = Modifier) {
     val backupStatus by vm.backupStatus.collectAsState()
     var editing by remember { mutableStateOf<EditorState?>(null) }
     var showEditor by remember { mutableStateOf(false) }
-    var showSettings by remember { mutableStateOf(false) }
+    var showAbout by remember { mutableStateOf(false) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
@@ -95,8 +109,9 @@ fun TodayScreen(modifier: Modifier = Modifier) {
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { editing = null; showEditor = true },
-                containerColor = Clay,
+                containerColor = Forest,
                 contentColor = Color.White,
+                shape = CircleShape,
                 text = { Text("Add to today", fontWeight = FontWeight.SemiBold) },
                 icon = { Icon(Icons.Filled.Add, contentDescription = null) },
             )
@@ -106,9 +121,24 @@ fun TodayScreen(modifier: Modifier = Modifier) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 96.dp),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 110.dp),
         ) {
-            item { Header(state, onSettings = { showSettings = true }) }
+            item {
+                TopBar(
+                    state = state,
+                    onExport = { exportLauncher.launch("cadence-backup.json") },
+                    onImport = { importLauncher.launch(arrayOf("application/json")) },
+                    onAbout = { showAbout = true },
+                )
+            }
+            item { WeekStrip(today = state.date) }
+            item {
+                QuoteBanner(
+                    quote = Quotes.forToday(),
+                    done = state.doneCount,
+                    total = state.totalCount,
+                )
+            }
 
             if (state.items.isEmpty()) {
                 item { EmptyState() }
@@ -170,47 +200,44 @@ fun TodayScreen(modifier: Modifier = Modifier) {
         )
     }
 
-    if (showSettings) {
+    if (showAbout) {
         AlertDialog(
-            onDismissRequest = { showSettings = false },
+            onDismissRequest = { showAbout = false },
             containerColor = Paper,
             shape = RoundedCornerShape(24.dp),
-            title = { Text("Cadence - T2", fontWeight = FontWeight.Bold, color = Ink) },
+            title = { Text("Cadence - T3", fontWeight = FontWeight.Bold, color = Ink) },
             text = {
                 Column {
-                    Text("Backup", style = MaterialTheme.typography.labelLarge, color = Faint)
-                    Spacer(Modifier.height(10.dp))
-                    TextButton(onClick = { exportLauncher.launch("cadence-backup.json") }) {
-                        Text("Export everything to a file", color = Clay, fontWeight = FontWeight.SemiBold)
-                    }
-                    TextButton(onClick = { importLauncher.launch(arrayOf("application/json")) }) {
-                        Text("Restore from a backup file", color = Ink, fontWeight = FontWeight.SemiBold)
-                    }
+                    Text(
+                        "Habits, routines and tasks with reminders, backup and a little robot cheering you on. Fully offline.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Ink,
+                    )
                     backupStatus?.let {
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height(10.dp))
                         Text(it, style = MaterialTheme.typography.bodySmall, color = Faint)
                     }
-                    Spacer(Modifier.height(14.dp))
-                    Text(
-                        "Reminders fire as system notifications and survive reboot. Set one from any item's edit dialog.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Faint,
-                    )
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showSettings = false }) { Text("Close", color = Faint) }
+                TextButton(onClick = { showAbout = false }) { Text("Close", color = Faint) }
             },
         )
     }
 }
 
 @Composable
-private fun Header(state: TodayUiState, onSettings: () -> Unit) {
+private fun TopBar(
+    state: TodayUiState,
+    onExport: () -> Unit,
+    onImport: () -> Unit,
+    onAbout: () -> Unit,
+) {
+    var menuOpen by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 16.dp),
+            .padding(top = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -219,7 +246,7 @@ private fun Header(state: TodayUiState, onSettings: () -> Unit) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = Faint,
             )
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(2.dp))
             Text(
                 "Today",
                 style = MaterialTheme.typography.displaySmall,
@@ -227,28 +254,130 @@ private fun Header(state: TodayUiState, onSettings: () -> Unit) {
                 color = Ink,
             )
         }
-        IconButton(onClick = onSettings) {
-            Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = Faint)
+        Box {
+            IconButton(onClick = { menuOpen = true }) {
+                Icon(Icons.Filled.MoreVert, contentDescription = "Menu", tint = Faint)
+            }
+            DropdownMenu(
+                expanded = menuOpen,
+                onDismissRequest = { menuOpen = false },
+                containerColor = CardWhite,
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Export backup") },
+                    onClick = { menuOpen = false; onExport() },
+                )
+                DropdownMenuItem(
+                    text = { Text("Import backup") },
+                    onClick = { menuOpen = false; onImport() },
+                )
+                DropdownMenuItem(
+                    text = { Text("About Cadence") },
+                    onClick = { menuOpen = false; onAbout() },
+                )
+            }
         }
-        ProgressRing(done = state.doneCount, total = state.totalCount)
+    }
+}
+
+@Composable
+private fun WeekStrip(today: LocalDate) {
+    val monday = today.with(DayOfWeek.MONDAY)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 18.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        (0..6).forEach { offset ->
+            val day = monday.plusDays(offset.toLong())
+            val isToday = day == today
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    day.format(DateTimeFormatter.ofPattern("EEE", Locale.getDefault())),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isToday) Ink else Faint,
+                    fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
+                )
+                Spacer(Modifier.height(6.dp))
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(if (isToday) Forest else CardWhite),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        day.dayOfMonth.toString(),
+                        color = if (isToday) Color.White else Faint,
+                        fontWeight = if (isToday) FontWeight.Bold else FontWeight.Medium,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuoteBanner(quote: String, done: Int, total: Int) {
+    val mood = when {
+        total == 0 -> KadieMood.SLEEP
+        done >= total -> KadieMood.HAPPY
+        else -> KadieMood.IDLE
+    }
+    Card(
+        shape = cardShape,
+        colors = CardDefaults.cardColors(containerColor = Pistachio),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 18.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Kadie(mood = mood, modifier = Modifier.size(56.dp))
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Daily spark",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Leaf,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    quote,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontStyle = FontStyle.Italic,
+                    color = Ink,
+                )
+            }
+            Spacer(Modifier.width(10.dp))
+            ProgressRing(done = done, total = total)
+        }
     }
 }
 
 @Composable
 private fun ProgressRing(done: Int, total: Int) {
-    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(72.dp)) {
-        Canvas(modifier = Modifier.size(72.dp)) {
-            val stroke = Stroke(width = 8.dp.toPx())
-            drawArc(color = Stone, startAngle = 0f, sweepAngle = 360f, useCenter = false, style = stroke)
-            if (total > 0) {
-                drawArc(
-                    color = Clay,
-                    startAngle = -90f,
-                    sweepAngle = 360f * done / total,
-                    useCenter = false,
-                    style = stroke,
-                )
-            }
+    val animated by animateFloatAsState(
+        targetValue = if (total > 0) done.toFloat() / total else 0f,
+        label = "ring",
+    )
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(64.dp)) {
+        Canvas(modifier = Modifier.size(64.dp)) {
+            val stroke = Stroke(width = 7.dp.toPx())
+            drawArc(color = CardWhite, startAngle = 0f, sweepAngle = 360f, useCenter = false, style = stroke)
+            drawArc(
+                color = Leaf,
+                startAngle = -90f,
+                sweepAngle = 360f * animated,
+                useCenter = false,
+                style = stroke,
+            )
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
@@ -267,37 +396,19 @@ private fun EmptyState() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 72.dp),
+            .padding(top = 56.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
             modifier = Modifier
-                .size(88.dp)
+                .size(96.dp)
                 .clip(CircleShape)
-                .background(Soft),
+                .background(Mist),
             contentAlignment = Alignment.Center,
         ) {
-            Canvas(modifier = Modifier.size(44.dp)) {
-                val r = size.minDimension / 2
-                drawRoundRect(
-                    color = Ink,
-                    topLeft = Offset(r * 0.3f, r * 0.45f),
-                    size = androidx.compose.ui.geometry.Size(r * 1.4f, r * 1.1f),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(r * 0.3f, r * 0.3f),
-                    style = Stroke(width = r * 0.12f),
-                )
-                drawCircle(color = Clay, radius = r * 0.1f, center = Offset(r * 0.8f, r * 0.95f))
-                drawCircle(color = Clay, radius = r * 0.1f, center = Offset(r * 1.2f, r * 0.95f))
-                drawLine(
-                    color = Ink,
-                    start = Offset(r, r * 0.45f),
-                    end = Offset(r, r * 0.12f),
-                    strokeWidth = r * 0.12f,
-                )
-                drawCircle(color = Clay, radius = r * 0.14f, center = Offset(r, r * 0.08f))
-            }
+            Kadie(mood = KadieMood.SLEEP, modifier = Modifier.size(56.dp))
         }
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(18.dp))
         Text(
             "A quiet day",
             style = MaterialTheme.typography.titleLarge,
@@ -314,19 +425,23 @@ private fun EmptyState() {
 }
 
 @Composable
-private fun CircleCheckbox(checked: Boolean, accent: Color = Clay, onClick: () -> Unit) {
+private fun CircleCheckbox(checked: Boolean, accent: Color = Leaf, onClick: () -> Unit) {
+    val haptics = LocalHapticFeedback.current
     Box(
         modifier = Modifier
             .size(28.dp)
             .clip(CircleShape)
             .background(if (checked) accent else Color.Transparent)
-            .clickable(onClick = onClick),
+            .clickable {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                onClick()
+            },
         contentAlignment = Alignment.Center,
     ) {
         Canvas(modifier = Modifier.size(28.dp)) {
             if (!checked) {
                 drawCircle(
-                    color = Stone,
+                    color = TeaMist,
                     radius = size.minDimension / 2 - 1.dp.toPx(),
                     style = Stroke(width = 2.dp.toPx()),
                 )
@@ -358,7 +473,7 @@ private fun HabitCard(item: TodayItem.Habit, onToggle: () -> Unit, onEdit: () ->
     Card(
         shape = cardShape,
         colors = CardDefaults.cardColors(
-            containerColor = if (item.done) Sage.copy(alpha = 0.35f) else CardWhite,
+            containerColor = if (item.done) SageDone else CardWhite,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier.fillMaxWidth().clickable(onClick = onEdit),
@@ -392,7 +507,7 @@ private fun RoutineCard(
     Card(
         shape = cardShape,
         colors = CardDefaults.cardColors(
-            containerColor = if (allDone) Lilac.copy(alpha = 0.30f) else CardWhite,
+            containerColor = if (allDone) Bamboo else CardWhite,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
@@ -420,7 +535,7 @@ private fun RoutineCard(
                 Spacer(Modifier.width(10.dp))
                 Text(
                     "Edit",
-                    color = Clay,
+                    color = Leaf,
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier
                         .clickable(onClick = onEdit)
@@ -439,7 +554,7 @@ private fun RoutineCard(
                         ) {
                             CircleCheckbox(
                                 checked = stepDone,
-                                accent = Lilac,
+                                accent = Forest,
                                 onClick = { onToggleStep(index, !stepDone) },
                             )
                             Spacer(Modifier.width(12.dp))
@@ -460,9 +575,9 @@ private fun RoutineCard(
 @Composable
 private fun TaskCard(item: TodayItem.Task, onToggle: () -> Unit, onEdit: () -> Unit) {
     val priorityColor = when (item.task.priority) {
-        "HIGH" -> Clay
-        "NORMAL" -> Butter
-        else -> Sage
+        "HIGH" -> Matcha
+        "NORMAL" -> Bamboo
+        else -> TeaMist
     }
     Card(
         shape = cardShape,
