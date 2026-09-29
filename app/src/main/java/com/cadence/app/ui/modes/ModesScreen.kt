@@ -4,6 +4,7 @@ import android.app.TimePickerDialog
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,11 +24,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -45,22 +43,30 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cadence.app.data.LockoutEntity
 import com.cadence.app.data.ModeEntity
 import com.cadence.app.modes.ModesManager
+import com.cadence.app.ui.components.CadenceSheet
+import com.cadence.app.ui.components.SheetLabel
+import com.cadence.app.ui.components.SheetPillButton
+import com.cadence.app.ui.components.SheetTextField
 import com.cadence.app.ui.components.cardShape
 import com.cadence.app.ui.theme.Bamboo
 import com.cadence.app.ui.theme.CardWhite
@@ -75,6 +81,8 @@ import com.cadence.app.ui.theme.Paper
 import com.cadence.app.ui.theme.Red
 import com.cadence.app.ui.theme.SkyBlue
 import com.cadence.app.ui.theme.TeaMist
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.util.Locale
 
 val modeColors: Map<String, Color> = mapOf(
@@ -141,7 +149,7 @@ fun ModesScreen(modifier: Modifier = Modifier) {
         if (!hasPolicy) {
             item {
                 PermissionRow(
-                    text = "Do Not Disturb access is needed for modes to silence the phone.",
+                    text = "Do Not Disturb access is needed for modes to silence the phone. Cadence should now appear in the system list.",
                     action = "Grant",
                     onClick = {
                         context.startActivity(
@@ -518,80 +526,75 @@ private fun ModeEditorDialog(
     var colorKey by remember { mutableStateOf(initial?.colorKey ?: "leaf") }
     var dnd by remember { mutableStateOf(initial?.dnd ?: true) }
     var blocklist by remember { mutableStateOf(initial?.blocklist ?: false) }
+    var confirmDelete by remember { mutableStateOf(false) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = Paper,
-        shape = RoundedCornerShape(24.dp),
-        title = {
-            Text(
-                if (initial == null) "New mode" else "Edit mode",
-                fontWeight = FontWeight.Bold,
-                color = Ink,
+    CadenceSheet(
+        onDismiss = onDismiss,
+        label = "A state of mind",
+        title = if (initial == null) "New mode." else "Edit mode.",
+        subtitle = "Silence the noise, guard your attention.",
+    ) {
+        Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+            SheetTextField(
+                value = name,
+                onValueChange = { name = it },
+                hint = "Name (e.g. Deep work)",
             )
-        },
-        text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    modeColors.keys.forEach { key ->
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .background(modeColors[key] ?: Leaf)
-                                .clickable { colorKey = key },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            if (colorKey == key) {
-                                Icon(
-                                    Icons.Filled.Check,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                            }
+
+            SheetLabel("Color")
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                modeColors.keys.forEach { key ->
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(modeColors[key] ?: Leaf)
+                            .clickable { colorKey = key },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (colorKey == key) {
+                            Icon(
+                                Icons.Filled.Check,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp),
+                            )
                         }
                     }
                 }
-                Spacer(Modifier.height(12.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "Do Not Disturb",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Ink,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Switch(
-                        checked = dnd,
-                        onCheckedChange = { dnd = it },
-                        colors = SwitchDefaults.colors(checkedTrackColor = Leaf),
-                    )
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "Block apps while active",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Ink,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Switch(
-                        checked = blocklist,
-                        onCheckedChange = { blocklist = it },
-                        colors = SwitchDefaults.colors(checkedTrackColor = Leaf),
-                    )
-                }
             }
-        },
-        confirmButton = {
-            TextButton(
+
+            SheetLabel("While active")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Do Not Disturb",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Ink,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(
+                    checked = dnd,
+                    onCheckedChange = { dnd = it },
+                    colors = SwitchDefaults.colors(checkedTrackColor = Leaf),
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Block apps",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Ink,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(
+                    checked = blocklist,
+                    onCheckedChange = { blocklist = it },
+                    colors = SwitchDefaults.colors(checkedTrackColor = Leaf),
+                )
+            }
+
+            Spacer(Modifier.height(18.dp))
+            SheetPillButton(
+                text = if (initial == null) "Create mode" else "Save changes",
                 onClick = {
                     if (name.isNotBlank()) {
                         onSave(
@@ -606,17 +609,26 @@ private fun ModeEditorDialog(
                         )
                     }
                 },
-            ) { Text("Save", color = Leaf, fontWeight = FontWeight.Bold) }
-        },
-        dismissButton = {
-            Row {
-                if (initial != null) {
-                    TextButton(onClick = { onDelete(initial) }) { Text("Delete", color = Faint) }
+            )
+            if (initial != null) {
+                Spacer(Modifier.height(6.dp))
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Text(
+                        if (confirmDelete) "Tap again to delete" else "Delete",
+                        color = if (confirmDelete) Red else Faint,
+                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                if (confirmDelete) onDelete(initial) else confirmDelete = true
+                            }
+                            .padding(10.dp),
+                    )
                 }
-                TextButton(onClick = onDismiss) { Text("Cancel", color = Faint) }
             }
-        },
-    )
+        }
+    }
 }
 
 @Composable
@@ -630,72 +642,113 @@ private fun AppPickerDialog(
     var checked by remember { mutableStateOf(selected) }
     var query by remember { mutableStateOf("") }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = Paper,
-        shape = RoundedCornerShape(24.dp),
-        title = { Text("Blocked apps", fontWeight = FontWeight.Bold, color = Ink) },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    placeholder = { Text("Search apps", color = Faint) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(8.dp))
-                val filtered = apps.filter {
-                    query.isBlank() || it.label.contains(query, ignoreCase = true)
-                }
-                if (apps.isEmpty()) {
-                    Text(
-                        "Loading apps...",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Faint,
-                        modifier = Modifier.padding(vertical = 24.dp),
-                    )
-                } else {
-                    LazyColumn(modifier = Modifier.height(320.dp)) {
-                        items(filtered.size) { index ->
-                            val appEntry = filtered[index]
-                            val isChecked = checked.contains(appEntry.packageName)
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        checked = if (isChecked) {
-                                            checked - appEntry.packageName
-                                        } else {
-                                            checked + appEntry.packageName
-                                        }
-                                    }
-                                    .padding(vertical = 4.dp),
-                            ) {
-                                Checkbox(
-                                    checked = isChecked,
-                                    onCheckedChange = null,
-                                    colors = CheckboxDefaults.colors(checkedColor = Leaf),
-                                )
-                                Text(
-                                    appEntry.label,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = Ink,
+    CadenceSheet(
+        onDismiss = onDismiss,
+        label = "App lockout",
+        title = "Blocked apps.",
+        subtitle = "These apps get the Kadie guard during blocked hours.",
+    ) {
+        SheetTextField(
+            value = query,
+            onValueChange = { query = it },
+            hint = "Search apps",
+        )
+        Spacer(Modifier.height(10.dp))
+        val filtered = apps.filter {
+            query.isBlank() || it.label.contains(query, ignoreCase = true)
+        }
+        if (apps.isEmpty()) {
+            Text(
+                "Loading apps...",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Faint,
+                modifier = Modifier.padding(vertical = 24.dp),
+            )
+        } else {
+            LazyColumn(modifier = Modifier.height(340.dp)) {
+                items(filtered.size) { index ->
+                    val appEntry = filtered[index]
+                    val isChecked = checked.contains(appEntry.packageName)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 3.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (isChecked) Mist else CardWhite)
+                            .clickable {
+                                checked = if (isChecked) {
+                                    checked - appEntry.packageName
+                                } else {
+                                    checked + appEntry.packageName
+                                }
+                            }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                    ) {
+                        AppIcon(packageName = appEntry.packageName)
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            appEntry.label,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = Ink,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(22.dp)
+                                .clip(CircleShape)
+                                .background(if (isChecked) Leaf else Color.Transparent),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (isChecked) {
+                                Icon(
+                                    Icons.Filled.Check,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(14.dp),
                                 )
                             }
                         }
                     }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = { onSave(checked) }) {
-                Text("Save", color = Leaf, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(14.dp))
+        SheetPillButton(
+            text = "Block ${checked.size} app" + (if (checked.size == 1) "" else "s"),
+            onClick = { onSave(checked) },
+        )
+    }
+}
+
+@Composable
+private fun AppIcon(packageName: String) {
+    val context = LocalContext.current
+    val icon by produceState<ImageBitmap?>(initialValue = null, packageName) {
+        value = withContext(Dispatchers.IO) {
+            try {
+                context.packageManager.getApplicationIcon(packageName)
+                    .toBitmap(width = 96, height = 96)
+                    .asImageBitmap()
+            } catch (e: Exception) {
+                null
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel", color = Faint) }
-        },
-    )
+        }
+    }
+    Box(
+        modifier = Modifier
+            .size(38.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Paper),
+        contentAlignment = Alignment.Center,
+    ) {
+        icon?.let {
+            Image(
+                bitmap = it,
+                contentDescription = null,
+                modifier = Modifier.size(32.dp),
+            )
+        }
+    }
 }
