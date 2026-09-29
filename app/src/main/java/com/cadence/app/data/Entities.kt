@@ -50,3 +50,10 @@ data class TaskEntity(
     val reminderMin: Int = -1,
     val doneAt: Long? = null
 )
+
+@Entity(tableName = "reviews")
+data class ReviewEntity(
+    @PrimaryKey val date: Long, // epochDay
+    val mood: String = "", // GREAT / OKAY / TOUGH
+    val note: String = ""
+)
