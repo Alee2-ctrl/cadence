@@ -49,6 +49,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.cadence.app.modes.ModesManager
 import com.cadence.app.ui.EditorState
 import com.cadence.app.ui.TodayItem
 import com.cadence.app.ui.TodayUiState
@@ -77,7 +78,8 @@ private val SECTION_ORDER = listOf("MORNING", "AFTERNOON", "EVENING", "ANYTIME")
 
 @Composable
 fun TodayScreen(modifier: Modifier = Modifier) {
-    val vm: TodayViewModel = viewModel(factory = TodayViewModel.factory(LocalContext.current))
+    val context = LocalContext.current
+    val vm: TodayViewModel = viewModel(factory = TodayViewModel.factory(context))
     val state by vm.state.collectAsState()
     val backupStatus by vm.backupStatus.collectAsState()
     var editing by remember { mutableStateOf<EditorState?>(null) }
@@ -122,7 +124,11 @@ fun TodayScreen(modifier: Modifier = Modifier) {
             item { WeekStrip(today = state.date) }
             item { QuoteBanner(quote = Quotes.forToday()) }
             item {
-                KadieSection(done = state.doneCount, total = state.totalCount)
+                KadieSection(
+                    done = state.doneCount,
+                    total = state.totalCount,
+                    forceSleep = ModesManager.activeModeName(context) == "Bedtime",
+                )
             }
 
             if (state.items.isEmpty()) {
@@ -191,11 +197,11 @@ fun TodayScreen(modifier: Modifier = Modifier) {
             onDismissRequest = { showAbout = false },
             containerColor = Paper,
             shape = RoundedCornerShape(24.dp),
-            title = { Text("Cadence - T4", fontWeight = FontWeight.Bold, color = Ink) },
+            title = { Text("Cadence - T8", fontWeight = FontWeight.Bold, color = Ink) },
             text = {
                 Column {
                     Text(
-                        "Habits, routines and tasks with reminders, backup, a planner and a little robot cheering you on. Fully offline.",
+                        "Habits, routines, tasks, notes, stats, modes and an app lockout - with a little robot cheering you on. Fully offline.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = Ink,
                     )
@@ -334,16 +340,18 @@ private fun QuoteBanner(quote: String) {
 }
 
 @Composable
-private fun KadieSection(done: Int, total: Int) {
+private fun KadieSection(done: Int, total: Int, forceSleep: Boolean) {
     val mood = when {
+        forceSleep -> KadieMood.SLEEP
         total == 0 -> KadieMood.SLEEP
         done >= total -> KadieMood.HAPPY
         else -> KadieMood.IDLE
     }
-    val (headline, subline) = when (mood) {
-        KadieMood.HAPPY -> "All clear!" to "Kadie is proud of you."
-        KadieMood.IDLE -> "Keep going" to "Kadie is watching your progress."
-        KadieMood.SLEEP -> "Quiet day" to "Kadie is recharging."
+    val (headline, subline) = when {
+        forceSleep -> "Bedtime mode" to "Kadie is sleeping. Shhh."
+        mood == KadieMood.HAPPY -> "All clear!" to "Kadie is proud of you."
+        mood == KadieMood.IDLE -> "Keep going" to "Kadie is watching your progress."
+        else -> "Quiet day" to "Kadie is recharging."
     }
     Row(
         modifier = Modifier
