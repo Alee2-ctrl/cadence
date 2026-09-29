@@ -7,8 +7,10 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -47,7 +49,6 @@ import com.cadence.app.ui.TodayItem
 import com.cadence.app.ui.theme.Bamboo
 import com.cadence.app.ui.theme.CardWhite
 import com.cadence.app.ui.theme.Faint
-import com.cadence.app.ui.theme.Forest
 import com.cadence.app.ui.theme.Honey
 import com.cadence.app.ui.theme.Ink
 import com.cadence.app.ui.theme.Leaf
@@ -103,15 +104,30 @@ fun CircleCheckbox(checked: Boolean, accent: Color = Leaf, onClick: () -> Unit) 
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun HabitCard(item: TodayItem.Habit, onToggle: () -> Unit, onEdit: () -> Unit) {
+fun HabitCard(
+    item: TodayItem.Habit,
+    onToggle: () -> Unit,
+    onEdit: () -> Unit,
+    onLongPress: (() -> Unit)? = null,
+) {
+    val haptics = LocalHapticFeedback.current
     Card(
         shape = cardShape,
         colors = CardDefaults.cardColors(
             containerColor = if (item.done) SageDone else CardWhite,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onEdit),
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = onEdit,
+                onLongClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onLongPress?.invoke()
+                },
+            ),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
@@ -132,13 +148,16 @@ fun HabitCard(item: TodayItem.Habit, onToggle: () -> Unit, onEdit: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun RoutineCard(
     item: TodayItem.Routine,
     onToggleStep: (Int, Boolean) -> Unit,
     onEdit: () -> Unit,
+    onLongPress: (() -> Unit)? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val haptics = LocalHapticFeedback.current
     val allDone = item.steps.isNotEmpty() && item.doneSteps.containsAll(item.steps.indices.toList())
     Card(
         shape = cardShape,
@@ -146,7 +165,15 @@ fun RoutineCard(
             containerColor = if (allDone) Bamboo else CardWhite,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = { expanded = !expanded },
+                onLongClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onLongPress?.invoke()
+                },
+            ),
     ) {
         Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -229,8 +256,15 @@ fun BlinkingDot(color: Color, blinking: Boolean, size: Int) {
     )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun TaskCard(item: TodayItem.Task, onToggle: () -> Unit, onEdit: () -> Unit) {
+fun TaskCard(
+    item: TodayItem.Task,
+    onToggle: () -> Unit,
+    onEdit: () -> Unit,
+    onLongPress: (() -> Unit)? = null,
+) {
+    val haptics = LocalHapticFeedback.current
     val (dotColor, dotSize) = when (item.task.priority) {
         "HIGH" -> Red to 13
         "NORMAL" -> Honey to 10
@@ -242,7 +276,15 @@ fun TaskCard(item: TodayItem.Task, onToggle: () -> Unit, onEdit: () -> Unit) {
             containerColor = if (item.task.done) Mist else CardWhite,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onEdit),
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = onEdit,
+                onLongClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onLongPress?.invoke()
+                },
+            ),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
