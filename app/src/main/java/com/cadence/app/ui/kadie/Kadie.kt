@@ -111,14 +111,16 @@ fun Kadie(
 
         fun px(x: Float) = padX + x * u + swayX
         fun py(y: Float) = padY + y * u - lift
+        fun line(color: Color, x1: Float, y1: Float, x2: Float, y2: Float, w: Float = strokeW) =
+            drawLine(color, Offset(px(x1), py(y1)), Offset(px(x2), py(y2)), strokeWidth = w, cap = StrokeCap.Round)
 
         // ---- antenna ----
         if (mood == KadieMood.FROWN) {
             // drooped antenna
-            drawLine(lineColor, px(32f), py(14f), px(36.5f), py(9f), strokeWidth = strokeW, cap = StrokeCap.Round)
+            line(lineColor, 32f, 14f, 36.5f, 9f)
             drawCircle(accent, radius = 2.1f * u, center = Offset(px(37.5f), py(8f)))
         } else {
-            drawLine(lineColor, px(32f), py(14f), px(32f), py(7.5f), strokeWidth = strokeW, cap = StrokeCap.Round)
+            line(lineColor, 32f, 14f, 32f, 7.5f)
             drawCircle(accent, radius = 2.2f * u, center = Offset(px(32f), py(5.6f)))
         }
 
@@ -208,10 +210,7 @@ fun Kadie(
                 center = Offset(px(32f), py(28.5f)),
                 style = stroke,
             )
-            KadieMood.IDLE -> drawLine(
-                lineColor, px(29f), py(28.5f), px(35f), py(28.5f),
-                strokeWidth = strokeW, cap = StrokeCap.Round,
-            )
+            KadieMood.IDLE -> line(lineColor, 29f, 28.5f, 35f, 28.5f)
         }
 
         // ---- body ----
@@ -228,20 +227,20 @@ fun Kadie(
         // ---- arms ----
         when (mood) {
             KadieMood.EXCITED -> {
-                drawLine(lineColor, px(23.5f), py(38f), px(19f), py(33f - wave * 2.4f), strokeWidth = strokeW, cap = StrokeCap.Round)
-                drawLine(lineColor, px(40.5f), py(38f), px(45f), py(33f - (1f - wave) * 2.4f), strokeWidth = strokeW, cap = StrokeCap.Round)
+                line(lineColor, 23.5f, 38f, 19f, 33f - wave * 2.4f)
+                line(lineColor, 40.5f, 38f, 45f, 33f - (1f - wave) * 2.4f)
             }
             KadieMood.HAPPY -> {
-                drawLine(lineColor, px(23.5f), py(38f), px(18.5f), py(31.5f), strokeWidth = strokeW, cap = StrokeCap.Round)
-                drawLine(lineColor, px(40.5f), py(38f), px(45.5f), py(31.5f), strokeWidth = strokeW, cap = StrokeCap.Round)
+                line(lineColor, 23.5f, 38f, 18.5f, 31.5f)
+                line(lineColor, 40.5f, 38f, 45.5f, 31.5f)
             }
             KadieMood.FROWN -> {
-                drawLine(lineColor, px(23.5f), py(38f), px(21.5f), py(45.5f), strokeWidth = strokeW, cap = StrokeCap.Round)
-                drawLine(lineColor, px(40.5f), py(38f), px(42.5f), py(45.5f), strokeWidth = strokeW, cap = StrokeCap.Round)
+                line(lineColor, 23.5f, 38f, 21.5f, 45.5f)
+                line(lineColor, 40.5f, 38f, 42.5f, 45.5f)
             }
             else -> {
-                drawLine(lineColor, px(23.5f), py(38f), px(20.5f), py(44f), strokeWidth = strokeW, cap = StrokeCap.Round)
-                drawLine(lineColor, px(40.5f), py(38f), px(43.5f), py(44f), strokeWidth = strokeW, cap = StrokeCap.Round)
+                line(lineColor, 23.5f, 38f, 20.5f, 44f)
+                line(lineColor, 40.5f, 38f, 43.5f, 44f)
             }
         }
 
@@ -264,8 +263,8 @@ fun Kadie(
             // sparkles
             val a = 0.35f + 0.65f * sparkle
             fun plus(cx: Float, cy: Float, r: Float) {
-                drawLine(accent.copy(alpha = a), px(cx - r), py(cy), px(cx + r), py(cy), strokeWidth = strokeW * 0.8f, cap = StrokeCap.Round)
-                drawLine(accent.copy(alpha = a), px(cx), py(cy - r), px(cx), py(cy + r), strokeWidth = strokeW * 0.8f, cap = StrokeCap.Round)
+                line(accent.copy(alpha = a), cx - r, cy, cx + r, cy, strokeW * 0.8f)
+                line(accent.copy(alpha = a), cx, cy - r, cx, cy + r, strokeW * 0.8f)
             }
             plus(14f, 18f, 2.2f)
             plus(51f, 12f, 1.8f)
@@ -276,9 +275,9 @@ fun Kadie(
             val za = 0.4f + 0.6f * sparkle
             val zStroke = strokeW * 0.8f
             fun zee(cx: Float, cy: Float, s: Float) {
-                drawLine(lineColor.copy(alpha = za), px(cx), py(cy), px(cx + s), py(cy), strokeWidth = zStroke, cap = StrokeCap.Round)
-                drawLine(lineColor.copy(alpha = za), px(cx + s), py(cy), px(cx), py(cy + s), strokeWidth = zStroke, cap = StrokeCap.Round)
-                drawLine(lineColor.copy(alpha = za), px(cx), py(cy + s), px(cx + s), py(cy + s), strokeWidth = zStroke, cap = StrokeCap.Round)
+                line(lineColor.copy(alpha = za), cx, cy, cx + s, cy, zStroke)
+                line(lineColor.copy(alpha = za), cx + s, cy, cx, cy + s, zStroke)
+                line(lineColor.copy(alpha = za), cx, cy + s, cx + s, cy + s, zStroke)
             }
             zee(46f, 8f + bob * 1.5f, 3.4f)
             zee(51f, 3f + bob * 1.5f, 2.4f)
