@@ -1,3 +1,5 @@
+import java.net.URL
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -36,22 +38,40 @@ android {
 }
 
 // Poppins is bundled at build time so the app stays 100% offline.
-val downloadFonts by registering {
+val fontMirrors = listOf(
+    "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/",
+    "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/",
+    "https://github.com/google/fonts/raw/main/ofl/poppins/",
+)
+
+val downloadFonts = tasks.register("downloadFonts") {
     onlyIf { !file("src/main/res/font/poppins_regular.ttf").exists() }
     doLast {
         val dir = file("src/main/res/font").apply { mkdirs() }
         mapOf(
-            "poppins_regular.ttf" to "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Regular.ttf",
-            "poppins_medium.ttf" to "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Medium.ttf",
-            "poppins_semibold.ttf" to "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-SemiBold.ttf",
-            "poppins_bold.ttf" to "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Bold.ttf",
-        ).forEach { (name, url) ->
+            "poppins_regular.ttf" to "Poppins-Regular.ttf",
+            "poppins_medium.ttf" to "Poppins-Medium.ttf",
+            "poppins_semibold.ttf" to "Poppins-SemiBold.ttf",
+            "poppins_bold.ttf" to "Poppins-Bold.ttf",
+        ).forEach { (name, remote) ->
             val target = File(dir, name)
-            if (!target.exists()) {
-                java.net.URI(url).toURL().openStream().use { input ->
-                    target.outputStream().use { output -> input.copyTo(output) }
+            if (target.exists()) return@forEach
+            var lastError: Exception? = null
+            for (mirror in fontMirrors) {
+                try {
+                    URL(mirror + remote).openConnection().apply {
+                        connectTimeout = 20000
+                        readTimeout = 30000
+                    }.getInputStream().use { input ->
+                        target.outputStream().use { output -> input.copyTo(output) }
+                    }
+                    lastError = null
+                    break
+                } catch (e: Exception) {
+                    lastError = e
                 }
             }
+            lastError?.let { throw it }
         }
     }
 }
