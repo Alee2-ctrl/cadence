@@ -100,8 +100,8 @@ private class KadieGuardView(context: Context) : View(context) {
             moveTo(sLeft, sTop)
             lineTo(sLeft + sw, sTop)
             lineTo(sLeft + sw, sTop + sh * 0.55f)
-            quadraticTo(sLeft + sw, sTop + sh * 0.95f, sLeft + sw / 2f, sTop + sh)
-            quadraticTo(sLeft, sTop + sh * 0.95f, sLeft, sTop + sh * 0.55f)
+            quadTo(sLeft + sw, sTop + sh * 0.95f, sLeft + sw / 2f, sTop + sh)
+            quadTo(sLeft, sTop + sh * 0.95f, sLeft, sTop + sh * 0.55f)
             close()
         }
         canvas.drawPath(path, matchaStroke)
