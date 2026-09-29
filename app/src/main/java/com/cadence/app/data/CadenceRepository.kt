@@ -10,6 +10,8 @@ class CadenceRepository(private val db: CadenceDatabase) {
     fun habitLogs(date: Long): Flow<List<HabitLogEntity>> = db.habitLogDao().forDate(date)
     fun routineLogs(date: Long): Flow<List<RoutineLogEntity>> = db.routineLogDao().forDate(date)
     fun tasksFor(date: Long): Flow<List<TaskEntity>> = db.taskDao().forDate(date)
+    fun tasksBetween(fromDate: Long, toDate: Long): Flow<List<TaskEntity>> =
+        db.taskDao().between(fromDate, toDate)
 
     suspend fun toggleHabit(habitId: Long, date: Long, done: Boolean) {
         if (done) {

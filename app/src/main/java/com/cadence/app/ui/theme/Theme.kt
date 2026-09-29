@@ -10,7 +10,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import com.cadence.app.R
 
-// Cadence T3 palette: matcha greens, forest ink, pistachio paper
+// Cadence palette: matcha greens, forest ink, pistachio paper
 val Paper = Color(0xFFF5F8EC)
 val CardWhite = Color(0xFFFFFFFF)
 val Ink = Color(0xFF013237)
@@ -23,6 +23,11 @@ val Mist = Color(0xFFEAF9E7)
 val Bamboo = Color(0xFFE6D4A6)
 val SageDone = Color(0xFFC0E6BA)
 val Faint = Color(0xFF6E8078)
+
+// Type + priority accents
+val Red = Color(0xFFD64545)
+val Honey = Color(0xFFD19A3D)
+val SkyBlue = Color(0xFF7FA8C9)
 
 val Poppins = FontFamily(
     Font(R.font.poppins_regular, FontWeight.Normal),

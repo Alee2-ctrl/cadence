@@ -69,6 +69,9 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE date = :date ORDER BY done, id")
     fun forDate(date: Long): Flow<List<TaskEntity>>
 
+    @Query("SELECT * FROM tasks WHERE date BETWEEN :fromDate AND :toDate")
+    fun between(fromDate: Long, toDate: Long): Flow<List<TaskEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(task: TaskEntity): Long
 
