@@ -1,7 +1,9 @@
 package com.cadence.app.ui.notes
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,12 +26,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -37,7 +36,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -48,13 +46,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cadence.app.data.NoteEntity
+import com.cadence.app.ui.components.CadenceSheet
+import com.cadence.app.ui.components.ItemActionsSheet
+import com.cadence.app.ui.components.SheetLabel
+import com.cadence.app.ui.components.SheetPillButton
+import com.cadence.app.ui.components.SheetTextField
 import com.cadence.app.ui.components.cardShape
 import com.cadence.app.ui.theme.Bamboo
 import com.cadence.app.ui.theme.CardWhite
@@ -67,6 +72,7 @@ import com.cadence.app.ui.theme.Matcha
 import com.cadence.app.ui.theme.Mist
 import com.cadence.app.ui.theme.Paper
 import com.cadence.app.ui.theme.Pistachio
+import com.cadence.app.ui.theme.Red
 import com.cadence.app.ui.theme.SkyBlue
 import com.cadence.app.ui.theme.TeaMist
 
@@ -88,6 +94,7 @@ fun NotesScreen(modifier: Modifier = Modifier) {
     val query by vm.query.collectAsState()
     var editing by remember { mutableStateOf<NoteEntity?>(null) }
     var showEditor by remember { mutableStateOf(false) }
+    var actionsFor by remember { mutableStateOf<NoteEntity?>(null) }
 
     Scaffold(
         modifier = modifier,
@@ -121,6 +128,7 @@ fun NotesScreen(modifier: Modifier = Modifier) {
                 onValueChange = { vm.query.value = it },
                 placeholder = { Text("Search notes", color = Faint) },
                 singleLine = true,
+                shape = RoundedCornerShape(18.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 12.dp),
@@ -148,6 +156,7 @@ fun NotesScreen(modifier: Modifier = Modifier) {
                         NoteCard(
                             note = note,
                             onClick = { editing = note; showEditor = true },
+                            onLongPress = { actionsFor = note },
                             onToggleLine = { idx -> vm.toggleCheckLine(note, idx) },
                         )
                     }
@@ -162,17 +171,36 @@ fun NotesScreen(modifier: Modifier = Modifier) {
             onDismiss = { showEditor = false },
             onSave = { vm.save(it); showEditor = false },
             onDelete = { vm.delete(it.id); showEditor = false },
-            onTogglePin = { vm.togglePin(it) },
+        )
+    }
+
+    actionsFor?.let { note ->
+        ItemActionsSheet(
+            name = note.title.ifBlank { "Untitled note" },
+            kind = "Note",
+            onEdit = {
+                editing = note
+                actionsFor = null
+                showEditor = true
+            },
+            onDelete = {
+                vm.delete(note.id)
+                actionsFor = null
+            },
+            onDismiss = { actionsFor = null },
         )
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun NoteCard(
     note: NoteEntity,
     onClick: () -> Unit,
+    onLongPress: () -> Unit,
     onToggleLine: (Int) -> Unit,
 ) {
+    val haptics = LocalHapticFeedback.current
     Card(
         shape = cardShape,
         colors = CardDefaults.cardColors(
@@ -181,7 +209,13 @@ private fun NoteCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onLongPress()
+                },
+            ),
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             if (note.pinned) {
@@ -262,85 +296,79 @@ private fun NoteEditorDialog(
     onDismiss: () -> Unit,
     onSave: (NoteEntity) -> Unit,
     onDelete: (NoteEntity) -> Unit,
-    onTogglePin: (NoteEntity) -> Unit,
 ) {
     var title by remember { mutableStateOf(initial?.title ?: "") }
     var text by remember { mutableStateOf(initial?.text ?: "") }
     var colorKey by remember { mutableStateOf(initial?.colorKey ?: "paper") }
     var isChecklist by remember { mutableStateOf(initial?.isChecklist ?: false) }
     var pinned by remember { mutableStateOf(initial?.pinned ?: false) }
+    var confirmDelete by remember { mutableStateOf(false) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = Paper,
-        shape = RoundedCornerShape(24.dp),
-        title = {
-            Text(
-                if (initial == null) "New note" else "Edit note",
-                fontWeight = FontWeight.Bold,
-                color = Ink,
+    CadenceSheet(
+        onDismiss = onDismiss,
+        label = "Catch an idea",
+        title = if (initial == null) "New note." else "Edit note.",
+        subtitle = if (isChecklist) "One checklist item per line." else "Write it down before it floats away.",
+    ) {
+        Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+            SheetTextField(
+                value = title,
+                onValueChange = { title = it },
+                hint = "Title",
             )
-        },
-        text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text("Title") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(10.dp))
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    label = { Text(if (isChecklist) "One item per line" else "Note") },
-                    minLines = 4,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    noteColors.keys.take(4).forEach { key ->
-                        ColorDot(key, colorKey == key) { colorKey = key }
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    noteColors.keys.drop(4).forEach { key ->
-                        ColorDot(key, colorKey == key) { colorKey = key }
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "Checklist",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Ink,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Switch(
-                        checked = isChecklist,
-                        onCheckedChange = { isChecklist = it },
-                        colors = SwitchDefaults.colors(checkedTrackColor = Leaf),
-                    )
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "Pinned",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Ink,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Switch(
-                        checked = pinned,
-                        onCheckedChange = { pinned = it },
-                        colors = SwitchDefaults.colors(checkedTrackColor = Leaf),
-                    )
+            Spacer(Modifier.height(10.dp))
+            SheetTextField(
+                value = text,
+                onValueChange = { text = it },
+                hint = if (isChecklist) "One item per line" else "Note",
+                singleLine = false,
+                minLines = 4,
+            )
+
+            SheetLabel("Color")
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                noteColors.keys.take(4).forEach { key ->
+                    ColorDot(key, colorKey == key) { colorKey = key }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                noteColors.keys.drop(4).forEach { key ->
+                    ColorDot(key, colorKey == key) { colorKey = key }
+                }
+            }
+
+            SheetLabel("Options")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Checklist",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Ink,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(
+                    checked = isChecklist,
+                    onCheckedChange = { isChecklist = it },
+                    colors = SwitchDefaults.colors(checkedTrackColor = Leaf),
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Pinned",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Ink,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(
+                    checked = pinned,
+                    onCheckedChange = { pinned = it },
+                    colors = SwitchDefaults.colors(checkedTrackColor = Leaf),
+                )
+            }
+
+            Spacer(Modifier.height(18.dp))
+            SheetPillButton(
+                text = if (initial == null) "Save note" else "Save changes",
                 onClick = {
                     if (title.isNotBlank() || text.isNotBlank()) {
                         val cleanedText = if (isChecklist) {
@@ -360,29 +388,38 @@ private fun NoteEditorDialog(
                                 colorKey = colorKey,
                                 isChecklist = isChecklist,
                                 pinned = pinned,
-                                updatedAt = initial?.updatedAt ?: System.currentTimeMillis(),
+                                updatedAt = System.currentTimeMillis(),
                             ),
                         )
                     }
                 },
-            ) { Text("Save", color = Leaf, fontWeight = FontWeight.Bold) }
-        },
-        dismissButton = {
-            Row {
-                if (initial != null) {
-                    TextButton(onClick = { onDelete(initial) }) { Text("Delete", color = Faint) }
+            )
+            if (initial != null) {
+                Spacer(Modifier.height(6.dp))
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Text(
+                        if (confirmDelete) "Tap again to delete" else "Delete",
+                        color = if (confirmDelete) Red else Faint,
+                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                if (confirmDelete) onDelete(initial) else confirmDelete = true
+                            }
+                            .padding(10.dp),
+                    )
                 }
-                TextButton(onClick = onDismiss) { Text("Cancel", color = Faint) }
             }
-        },
-    )
+        }
+    }
 }
 
 @Composable
 private fun ColorDot(key: String, selected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(30.dp)
+            .size(34.dp)
             .clip(CircleShape)
             .background(noteColors[key] ?: CardWhite)
             .clickable(onClick = onClick),
