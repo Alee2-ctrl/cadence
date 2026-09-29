@@ -1,5 +1,6 @@
 package com.cadence.app.ui.today
 
+import android.app.TimePickerDialog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cadence.app.ui.EditorState
@@ -33,6 +35,7 @@ import com.cadence.app.ui.theme.Faint
 import com.cadence.app.ui.theme.Ink
 import com.cadence.app.ui.theme.Paper
 import com.cadence.app.ui.theme.Soft
+import java.util.Locale
 
 @Composable
 fun ItemEditorDialog(
@@ -47,6 +50,8 @@ fun ItemEditorDialog(
     var timeOfDay by remember { mutableStateOf(initial?.timeOfDay ?: "ANYTIME") }
     var priority by remember { mutableStateOf(initial?.priority ?: "NORMAL") }
     var steps by remember { mutableStateOf(initial?.steps ?: "") }
+    var reminderMin by remember { mutableIntStateOf(initial?.reminderMin ?: -1) }
+    val context = LocalContext.current
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -109,6 +114,21 @@ fun ItemEditorDialog(
                     )
                 }
 
+                ReminderRow(
+                    reminderMin = reminderMin,
+                    onOff = { reminderMin = -1 },
+                    onPick = {
+                        val startMin = if (reminderMin >= 0) reminderMin else 8 * 60
+                        TimePickerDialog(
+                            context,
+                            { _, hour, minute -> reminderMin = hour * 60 + minute },
+                            startMin / 60,
+                            startMin % 60,
+                            true,
+                        ).show()
+                    },
+                )
+
                 if (type == "ROUTINE") {
                     Spacer(Modifier.height(10.dp))
                     OutlinedTextField(
@@ -134,6 +154,9 @@ fun ItemEditorDialog(
                                 timeOfDay = timeOfDay,
                                 priority = priority,
                                 steps = steps,
+                                reminderMin = reminderMin,
+                                date = initial?.date ?: 0,
+                                done = initial?.done ?: false,
                             ),
                         )
                     }
@@ -149,6 +172,45 @@ fun ItemEditorDialog(
             }
         },
     )
+}
+
+@Composable
+private fun ReminderRow(reminderMin: Int, onOff: () -> Unit, onPick: () -> Unit) {
+    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+        Text("Reminder", style = MaterialTheme.typography.labelMedium, color = Faint)
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = reminderMin < 0,
+                onClick = onOff,
+                label = { Text("Off", style = MaterialTheme.typography.labelMedium) },
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = CardWhite,
+                    labelColor = Faint,
+                    selectedContainerColor = Soft,
+                    selectedLabelColor = Ink,
+                ),
+            )
+            FilterChip(
+                selected = reminderMin >= 0,
+                onClick = onPick,
+                label = {
+                    Text(
+                        if (reminderMin >= 0)
+                            String.format(Locale.getDefault(), "%02d:%02d", reminderMin / 60, reminderMin % 60)
+                        else "Set time",
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                },
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = CardWhite,
+                    labelColor = Faint,
+                    selectedContainerColor = Soft,
+                    selectedLabelColor = Clay,
+                ),
+            )
+        }
+    }
 }
 
 @Composable

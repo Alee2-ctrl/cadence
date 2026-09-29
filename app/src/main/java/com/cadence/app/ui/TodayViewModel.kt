@@ -1,9 +1,11 @@
 package com.cadence.app.ui
 
 import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.cadence.app.data.BackupManager
 import com.cadence.app.data.CadenceDatabase
 import com.cadence.app.data.CadenceRepository
 import com.cadence.app.data.HabitEntity
@@ -11,6 +13,9 @@ import com.cadence.app.data.HabitLogEntity
 import com.cadence.app.data.RoutineEntity
 import com.cadence.app.data.RoutineLogEntity
 import com.cadence.app.data.TaskEntity
+import com.cadence.app.notifications.ReminderScheduler
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -53,6 +58,7 @@ data class EditorState(
     val timeOfDay: String = "ANYTIME",
     val priority: String = "NORMAL",
     val steps: String = "",
+    val reminderMin: Int = -1,
     val date: Long = 0,
     val done: Boolean = false
 ) {
@@ -63,7 +69,8 @@ data class EditorState(
                 type = "HABIT",
                 name = item.habit.name,
                 daysMask = item.habit.daysMask,
-                timeOfDay = item.habit.timeOfDay
+                timeOfDay = item.habit.timeOfDay,
+                reminderMin = item.habit.reminderMin
             )
             is TodayItem.Routine -> EditorState(
                 id = item.routine.id,
@@ -71,13 +78,15 @@ data class EditorState(
                 name = item.routine.name,
                 daysMask = item.routine.daysMask,
                 timeOfDay = item.routine.timeOfDay,
-                steps = item.routine.steps
+                steps = item.routine.steps,
+                reminderMin = item.routine.reminderMin
             )
             is TodayItem.Task -> EditorState(
                 id = item.task.id,
                 type = "TASK",
                 name = item.task.title,
                 priority = item.task.priority,
+                reminderMin = item.task.reminderMin,
                 date = item.task.date,
                 done = item.task.done
             )
@@ -85,11 +94,17 @@ data class EditorState(
     }
 }
 
-class TodayViewModel(private val repo: CadenceRepository) : ViewModel() {
+class TodayViewModel(
+    private val app: Context,
+    private val db: CadenceDatabase,
+    private val repo: CadenceRepository
+) : ViewModel() {
 
     private val today: LocalDate = LocalDate.now()
     private val todayEpoch: Long = today.toEpochDay()
     private val todayMask: Int = 1 shl (today.dayOfWeek.value - 1)
+
+    val backupStatus = MutableStateFlow<String?>(null)
 
     val state: StateFlow<TodayUiState> = combine(
         repo.habits,
@@ -164,36 +179,61 @@ class TodayViewModel(private val repo: CadenceRepository) : ViewModel() {
 
     fun toggleTask(task: TaskEntity) = viewModelScope.launch {
         repo.toggleTask(task)
+        if (task.reminderMin >= 0 && task.done.not()) {
+            // just completed -> cancel reminder
+            ReminderScheduler.cancel(app, ReminderScheduler.TYPE_TASK, task.id)
+        }
     }
 
     fun save(editor: EditorState) = viewModelScope.launch {
         when (editor.type) {
-            "TASK" -> repo.upsertTask(
-                TaskEntity(
-                    id = editor.id,
-                    title = editor.name.trim(),
-                    date = if (editor.date > 0) editor.date else todayEpoch,
-                    priority = editor.priority,
-                    done = editor.done
+            "TASK" -> {
+                val newId = repo.upsertTask(
+                    TaskEntity(
+                        id = editor.id,
+                        title = editor.name.trim(),
+                        date = if (editor.date > 0) editor.date else todayEpoch,
+                        priority = editor.priority,
+                        done = editor.done,
+                        reminderMin = editor.reminderMin
+                    )
                 )
-            )
-            "HABIT" -> repo.upsertHabit(
-                HabitEntity(
-                    id = editor.id,
-                    name = editor.name.trim(),
-                    daysMask = editor.daysMask,
-                    timeOfDay = editor.timeOfDay
+                ReminderScheduler.scheduleItem(
+                    app, ReminderScheduler.TYPE_TASK, newId, editor.name.trim(),
+                    0, if (editor.date > 0) editor.date else todayEpoch, editor.reminderMin
                 )
-            )
-            "ROUTINE" -> repo.upsertRoutine(
-                RoutineEntity(
-                    id = editor.id,
-                    name = editor.name.trim(),
-                    steps = editor.steps,
-                    daysMask = editor.daysMask,
-                    timeOfDay = editor.timeOfDay
+            }
+            "HABIT" -> {
+                val newId = repo.upsertHabit(
+                    HabitEntity(
+                        id = editor.id,
+                        name = editor.name.trim(),
+                        daysMask = editor.daysMask,
+                        timeOfDay = editor.timeOfDay,
+                        reminderMin = editor.reminderMin
+                    )
                 )
-            )
+                ReminderScheduler.scheduleItem(
+                    app, ReminderScheduler.TYPE_HABIT, newId, editor.name.trim(),
+                    editor.daysMask, 0, editor.reminderMin
+                )
+            }
+            "ROUTINE" -> {
+                val newId = repo.upsertRoutine(
+                    RoutineEntity(
+                        id = editor.id,
+                        name = editor.name.trim(),
+                        steps = editor.steps,
+                        daysMask = editor.daysMask,
+                        timeOfDay = editor.timeOfDay,
+                        reminderMin = editor.reminderMin
+                    )
+                )
+                ReminderScheduler.scheduleItem(
+                    app, ReminderScheduler.TYPE_ROUTINE, newId, editor.name.trim(),
+                    editor.daysMask, 0, editor.reminderMin
+                )
+            }
         }
     }
 
@@ -203,6 +243,26 @@ class TodayViewModel(private val repo: CadenceRepository) : ViewModel() {
             "HABIT" -> repo.deleteHabit(editor.id)
             "ROUTINE" -> repo.deleteRoutine(editor.id)
         }
+        ReminderScheduler.cancel(app, editor.type, editor.id)
+    }
+
+    fun exportBackup(uri: Uri) = viewModelScope.launch(Dispatchers.IO) {
+        backupStatus.value = try {
+            val count = BackupManager.export(app, repo, uri)
+            "Exported $count items"
+        } catch (e: Exception) {
+            "Export failed: ${e.message}"
+        }
+    }
+
+    fun importBackup(uri: Uri) = viewModelScope.launch(Dispatchers.IO) {
+        backupStatus.value = try {
+            val count = BackupManager.import(app, repo, uri)
+            ReminderScheduler.rescheduleAll(app, db)
+            "Imported $count items"
+        } catch (e: Exception) {
+            "Import failed: ${e.message}"
+        }
     }
 
     companion object {
@@ -211,7 +271,11 @@ class TodayViewModel(private val repo: CadenceRepository) : ViewModel() {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     val db = CadenceDatabase.get(context)
-                    return TodayViewModel(CadenceRepository(db)) as T
+                    return TodayViewModel(
+                        context.applicationContext,
+                        db,
+                        CadenceRepository(db)
+                    ) as T
                 }
             }
     }
