@@ -9,7 +9,7 @@ object BackupManager {
 
     suspend fun export(context: Context, repo: CadenceRepository, uri: Uri): Int {
         val root = JSONObject()
-        root.put("version", 3)
+        root.put("version", 4)
 
         val habits = JSONArray()
         repo.allHabits().forEach { h ->
@@ -67,11 +67,39 @@ object BackupManager {
         }
         root.put("reviews", reviews)
 
+        val notes = JSONArray()
+        repo.allNotes().forEach { n ->
+            notes.put(JSONObject().apply {
+                put("id", n.id); put("title", n.title); put("text", n.text)
+                put("colorKey", n.colorKey); put("isChecklist", n.isChecklist)
+                put("pinned", n.pinned); put("updatedAt", n.updatedAt)
+            })
+        }
+        root.put("notes", notes)
+
+        val modes = JSONArray()
+        repo.allModes().forEach { m ->
+            modes.put(JSONObject().apply {
+                put("id", m.id); put("name", m.name); put("colorKey", m.colorKey)
+                put("dnd", m.dnd); put("blocklist", m.blocklist)
+                put("createdAt", m.createdAt)
+            })
+        }
+        root.put("modes", modes)
+
+        repo.lockoutOnce()?.let { l ->
+            root.put("lockout", JSONObject().apply {
+                put("enabled", l.enabled); put("startMin", l.startMin)
+                put("endMin", l.endMin); put("reason", l.reason)
+                put("blockedPackages", l.blockedPackages)
+            })
+        }
+
         context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use {
             it.write(root.toString())
         } ?: throw IllegalStateException("Cannot write to selected file")
 
-        return habits.length() + routines.length() + tasks.length()
+        return habits.length() + routines.length() + tasks.length() + notes.length()
     }
 
     suspend fun import(context: Context, repo: CadenceRepository, uri: Uri): Int {
@@ -172,6 +200,52 @@ object BackupManager {
                     )
                 )
             }
+        }
+
+        root.optJSONArray("notes")?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                repo.upsertNote(
+                    NoteEntity(
+                        id = o.getLong("id"),
+                        title = o.optString("title", ""),
+                        text = o.optString("text", ""),
+                        colorKey = o.optString("colorKey", "paper"),
+                        isChecklist = o.optBoolean("isChecklist", false),
+                        pinned = o.optBoolean("pinned", false),
+                        updatedAt = o.optLong("updatedAt", System.currentTimeMillis())
+                    )
+                )
+                count++
+            }
+        }
+
+        root.optJSONArray("modes")?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                repo.upsertMode(
+                    ModeEntity(
+                        id = o.getLong("id"),
+                        name = o.getString("name"),
+                        colorKey = o.optString("colorKey", "leaf"),
+                        dnd = o.optBoolean("dnd", true),
+                        blocklist = o.optBoolean("blocklist", false),
+                        createdAt = o.optLong("createdAt", System.currentTimeMillis())
+                    )
+                )
+            }
+        }
+
+        root.optJSONObject("lockout")?.let { o ->
+            repo.upsertLockout(
+                LockoutEntity(
+                    enabled = o.optBoolean("enabled", false),
+                    startMin = o.optInt("startMin", 21 * 60),
+                    endMin = o.optInt("endMin", 8 * 60),
+                    reason = o.optString("reason", ""),
+                    blockedPackages = o.optString("blockedPackages", "")
+                )
+            )
         }
 
         return count
