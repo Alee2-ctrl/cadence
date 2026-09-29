@@ -33,6 +33,7 @@ import com.cadence.app.ui.theme.Leaf
 import com.cadence.app.ui.theme.Paper
 import com.cadence.app.ui.today.TodayScreen
 
+// Root navigation: Today / Plan / Notes / Stats
 private data class Tab(val label: String, val icon: ImageVector, val placeholder: String?)
 
 @Composable
