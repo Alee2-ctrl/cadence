@@ -8,9 +8,11 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.PixelFormat
-import android.graphics.Typeface
+import android.graphics.RectF
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Handler
@@ -20,11 +22,11 @@ import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
-import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.res.ResourcesCompat
 import com.cadence.app.R
 import com.cadence.app.data.CadenceDatabase
 import com.cadence.app.data.LockoutEntity
@@ -33,6 +35,85 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+
+// Line-art Kadie standing guard, drawn to match the roadmap T7 sketch:
+// rounded head outline, clay antenna ball, clay eyes, small smile, shield.
+private class KadieGuardView(context: Context) : View(context) {
+
+    private val paperStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(0xF5, 0xF8, 0xEC)
+        style = Paint.Style.STROKE
+        strokeWidth = 5f
+        strokeCap = Paint.Cap.ROUND
+    }
+    private val clayFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(0xD1, 0x9A, 0x3D)
+        style = Paint.Style.FILL
+    }
+    private val matchaStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(0xA9, 0xC6, 0x32)
+        style = Paint.Style.STROKE
+        strokeWidth = 5f
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        val w = width.toFloat()
+        val h = height.toFloat()
+        val cx = w / 2f
+
+        // Head: rounded square outline
+        val headW = w * 0.46f
+        val headH = h * 0.52f
+        val headLeft = cx - headW / 2f
+        val headTop = h * 0.24f
+        val head = RectF(headLeft, headTop, headLeft + headW, headTop + headH)
+        canvas.drawRoundRect(head, headW * 0.32f, headW * 0.32f, paperStroke)
+
+        // Antenna: stem + clay ball
+        val stemTop = headTop - h * 0.16f
+        canvas.drawLine(cx, headTop, cx, stemTop + h * 0.05f, paperStroke)
+        canvas.drawCircle(cx, stemTop, h * 0.045f, clayFill)
+
+        // Eyes: two clay dots
+        val eyeY = headTop + headH * 0.42f
+        canvas.drawCircle(cx - headW * 0.18f, eyeY, h * 0.032f, clayFill)
+        canvas.drawCircle(cx + headW * 0.18f, eyeY, h * 0.032f, clayFill)
+
+        // Smile: shallow arc
+        val smile = RectF(
+            cx - headW * 0.12f,
+            eyeY + headH * 0.10f,
+            cx + headW * 0.12f,
+            eyeY + headH * 0.30f,
+        )
+        canvas.drawArc(smile, 15f, 150f, false, paperStroke)
+
+        // Shield at lower right of the head
+        val sw = w * 0.22f
+        val sh = h * 0.26f
+        val sLeft = headLeft + headW - sw * 0.30f
+        val sTop = headTop + headH - sh * 0.55f
+        val path = android.graphics.Path().apply {
+            moveTo(sLeft, sTop)
+            lineTo(sLeft + sw, sTop)
+            lineTo(sLeft + sw, sTop + sh * 0.55f)
+            quadraticTo(sLeft + sw, sTop + sh * 0.95f, sLeft + sw / 2f, sTop + sh)
+            quadraticTo(sLeft, sTop + sh * 0.95f, sLeft, sTop + sh * 0.55f)
+            close()
+        }
+        canvas.drawPath(path, matchaStroke)
+
+        // Check inside the shield
+        val ck = sh * 0.28f
+        val ckx = sLeft + sw / 2f
+        val cky = sTop + sh * 0.48f
+        canvas.drawLine(ckx - ck * 0.7f, cky, ckx - ck * 0.15f, cky + ck * 0.55f, matchaStroke)
+        canvas.drawLine(ckx - ck * 0.15f, cky + ck * 0.55f, ckx + ck * 0.8f, cky - ck * 0.5f, matchaStroke)
+    }
+}
 
 class LockoutService : Service() {
 
@@ -148,6 +229,9 @@ class LockoutService : Service() {
         pkg
     }
 
+    private fun fmt(min: Int): String =
+        String.format(java.util.Locale.getDefault(), "%02d:%02d", min / 60, min % 60)
+
     private fun showOverlay(pkg: String) {
         if (!Settings.canDrawOverlays(this)) return
         if (overlayView != null && overlayFor == pkg) return
@@ -155,79 +239,145 @@ class LockoutService : Service() {
 
         val wm = getSystemService(WindowManager::class.java) ?: return
         val density = resources.displayMetrics.density
-        fun dp(v: Int) = (v * density).toInt()
+        fun dp(v: Float) = (v * density).toInt()
+
+        val poppinsBold = ResourcesCompat.getFont(this, R.font.poppins_bold)
+        val poppinsMedium = ResourcesCompat.getFont(this, R.font.poppins_medium)
+
+        val paper = Color.rgb(0xF5, 0xF8, 0xEC)
+        val matcha = Color.rgb(0xA9, 0xC6, 0x32)
+        val muted = Color.rgb(0xC9, 0xC4, 0xBC)
+        val faintOnDark = Color.rgb(0x8A, 0x83, 0x78)
 
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(dp(32), dp(32), dp(32), dp(32))
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(28f), dp(56f), dp(28f), dp(36f))
             setBackgroundColor(Color.rgb(0x14, 0x13, 0x12))
         }
 
-        val label = TextView(this).apply {
-            text = "CADENCE LOCKOUT"
-            setTextColor(Color.rgb(0xA9, 0xC6, 0x32))
+        // Mono status strip: BLOCKED 21:00 - 08:00
+        val strip = TextView(this).apply {
+            text = "BLOCKED  ${fmt(config.startMin)} – ${fmt(config.endMin)}"
+            setTextColor(matcha)
             textSize = 11f
-            letterSpacing = 0.25f
-            typeface = Typeface.DEFAULT_BOLD
+            letterSpacing = 0.3f
+            typeface = poppinsBold
             gravity = Gravity.CENTER
         }
-        layout.addView(label)
+        layout.addView(strip, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ))
+
+        // Kadie line art
+        val kadie = KadieGuardView(this)
+        layout.addView(kadie, LinearLayout.LayoutParams(dp(190f), dp(190f)).apply {
+            topMargin = dp(28f)
+        })
 
         val title = TextView(this).apply {
             text = "${appLabel(pkg)} is locked."
-            setTextColor(Color.rgb(0xF5, 0xF8, 0xEC))
-            textSize = 24f
-            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(paper)
+            textSize = 25f
+            typeface = poppinsBold
             gravity = Gravity.CENTER
-            setPadding(0, dp(20), 0, 0)
+            setPadding(0, dp(24f), 0, 0)
         }
-        layout.addView(title)
+        layout.addView(title, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ))
 
         val reasonText = config.reason.ifBlank { "This app is locked right now." }
         val reason = TextView(this).apply {
             text = "\"$reasonText\""
-            setTextColor(Color.rgb(0xC9, 0xC4, 0xBC))
+            setTextColor(muted)
             textSize = 14f
+            typeface = poppinsMedium
             gravity = Gravity.CENTER
-            setPadding(0, dp(12), 0, 0)
+            setPadding(dp(12f), dp(12f), dp(12f), 0)
         }
-        layout.addView(reason)
+        layout.addView(reason, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ))
 
-        val backButton = Button(this).apply {
+        // Paper pill: Take me back
+        val backButton = TextView(this).apply {
             text = "Take me back"
-            setTextColor(Color.rgb(0x1C, 0x19, 0x17))
-            typeface = Typeface.DEFAULT_BOLD
-            background = GradientDrawable().apply {
-                setColor(Color.rgb(0xF5, 0xF8, 0xEC))
-                cornerRadius = dp(24).toFloat()
-            }
-            setOnClickListener {
-                goHome()
-                hideOverlay()
-            }
-        }
-        val buttonParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-        ).apply { topMargin = dp(32) }
-        layout.addView(backButton, buttonParams)
-
-        val breakButton = TextView(this).apply {
-            text = "Emergency: 5 minute break"
-            setTextColor(Color.rgb(0x8A, 0x83, 0x78))
-            textSize = 12f
+            setTextColor(Color.rgb(0x14, 0x13, 0x12))
+            textSize = 15f
+            typeface = poppinsBold
             gravity = Gravity.CENTER
-            setPadding(0, dp(20), 0, 0)
+            background = GradientDrawable().apply {
+                setColor(paper)
+                cornerRadius = dp(28f).toFloat()
+            }
             setOnClickListener {
-                getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-                    .putLong(KEY_BREAK_UNTIL, System.currentTimeMillis() + 5 * 60 * 1000)
-                    .apply()
                 goHome()
                 hideOverlay()
             }
         }
-        layout.addView(breakButton)
+        layout.addView(backButton, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(54f),
+        ).apply { topMargin = dp(36f) })
+
+        // Break chips: 5m / 10m / 15m
+        val chipRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        listOf(5, 10, 15).forEach { minutes ->
+            val chip = TextView(this).apply {
+                text = "${minutes}m break"
+                setTextColor(paper)
+                textSize = 12f
+                typeface = poppinsMedium
+                gravity = Gravity.CENTER
+                background = GradientDrawable().apply {
+                    setColor(Color.TRANSPARENT)
+                    cornerRadius = dp(20f).toFloat()
+                    setStroke(dp(1.5f), Color.rgb(0x4A, 0x45, 0x3E))
+                }
+                setPadding(dp(18f), 0, dp(18f), 0)
+                setOnClickListener {
+                    getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                        .putLong(
+                            KEY_BREAK_UNTIL,
+                            System.currentTimeMillis() + minutes * 60 * 1000L,
+                        )
+                        .apply()
+                    goHome()
+                    hideOverlay()
+                }
+            }
+            chipRow.addView(chip, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                dp(40f),
+            ).apply {
+                marginStart = dp(6f)
+                marginEnd = dp(6f)
+            })
+        }
+        layout.addView(chipRow, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ).apply { topMargin = dp(22f) })
+
+        val hint = TextView(this).apply {
+            text = "Emergency break pauses the lockout briefly."
+            setTextColor(faintOnDark)
+            textSize = 11f
+            typeface = poppinsMedium
+            gravity = Gravity.CENTER
+            setPadding(0, dp(18f), 0, 0)
+        }
+        layout.addView(hint, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ))
 
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
