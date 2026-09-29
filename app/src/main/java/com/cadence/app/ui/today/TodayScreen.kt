@@ -2,11 +2,7 @@ package com.cadence.app.ui.today
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,8 +21,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -49,43 +43,36 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cadence.app.ui.EditorState
 import com.cadence.app.ui.TodayItem
 import com.cadence.app.ui.TodayUiState
 import com.cadence.app.ui.TodayViewModel
+import com.cadence.app.ui.components.HabitCard
+import com.cadence.app.ui.components.KadiePod
+import com.cadence.app.ui.components.RoutineCard
+import com.cadence.app.ui.components.TaskCard
+import com.cadence.app.ui.components.cardShape
 import com.cadence.app.ui.kadie.Kadie
 import com.cadence.app.ui.kadie.KadieMood
-import com.cadence.app.ui.theme.Bamboo
 import com.cadence.app.ui.theme.CardWhite
 import com.cadence.app.ui.theme.Faint
 import com.cadence.app.ui.theme.Forest
 import com.cadence.app.ui.theme.Ink
 import com.cadence.app.ui.theme.Leaf
-import com.cadence.app.ui.theme.Matcha
 import com.cadence.app.ui.theme.Mist
 import com.cadence.app.ui.theme.Paper
 import com.cadence.app.ui.theme.Pistachio
-import com.cadence.app.ui.theme.SageDone
-import com.cadence.app.ui.theme.TeaMist
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private val SECTION_ORDER = listOf("MORNING", "AFTERNOON", "EVENING", "ANYTIME")
-private val cardShape = RoundedCornerShape(24.dp)
 
 @Composable
 fun TodayScreen(modifier: Modifier = Modifier) {
@@ -132,12 +119,9 @@ fun TodayScreen(modifier: Modifier = Modifier) {
                 )
             }
             item { WeekStrip(today = state.date) }
+            item { QuoteBanner(quote = Quotes.forToday()) }
             item {
-                QuoteBanner(
-                    quote = Quotes.forToday(),
-                    done = state.doneCount,
-                    total = state.totalCount,
-                )
+                KadieSection(done = state.doneCount, total = state.totalCount)
             }
 
             if (state.items.isEmpty()) {
@@ -194,6 +178,7 @@ fun TodayScreen(modifier: Modifier = Modifier) {
     if (showEditor) {
         ItemEditorDialog(
             initial = editing,
+            defaultDate = state.date.toEpochDay(),
             onDismiss = { showEditor = false },
             onSave = { vm.save(it); showEditor = false },
             onDelete = { vm.delete(it); showEditor = false },
@@ -205,11 +190,11 @@ fun TodayScreen(modifier: Modifier = Modifier) {
             onDismissRequest = { showAbout = false },
             containerColor = Paper,
             shape = RoundedCornerShape(24.dp),
-            title = { Text("Cadence - T3", fontWeight = FontWeight.Bold, color = Ink) },
+            title = { Text("Cadence - T4", fontWeight = FontWeight.Bold, color = Ink) },
             text = {
                 Column {
                     Text(
-                        "Habits, routines and tasks with reminders, backup and a little robot cheering you on. Fully offline.",
+                        "Habits, routines and tasks with reminders, backup, a planner and a little robot cheering you on. Fully offline.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = Ink,
                     )
@@ -320,12 +305,7 @@ private fun WeekStrip(today: LocalDate) {
 }
 
 @Composable
-private fun QuoteBanner(quote: String, done: Int, total: Int) {
-    val mood = when {
-        total == 0 -> KadieMood.SLEEP
-        done >= total -> KadieMood.HAPPY
-        else -> KadieMood.IDLE
-    }
+private fun QuoteBanner(quote: String) {
     Card(
         shape = cardShape,
         colors = CardDefaults.cardColors(containerColor = Pistachio),
@@ -334,59 +314,69 @@ private fun QuoteBanner(quote: String, done: Int, total: Int) {
             .fillMaxWidth()
             .padding(top = 18.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Kadie(mood = mood, modifier = Modifier.size(56.dp))
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    "Daily spark",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Leaf,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    quote,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontStyle = FontStyle.Italic,
-                    color = Ink,
-                )
-            }
-            Spacer(Modifier.width(10.dp))
-            ProgressRing(done = done, total = total)
+        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
+            Text(
+                "Daily spark",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = Leaf,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                quote,
+                style = MaterialTheme.typography.bodyMedium,
+                fontStyle = FontStyle.Italic,
+                color = Ink,
+            )
         }
     }
 }
 
 @Composable
-private fun ProgressRing(done: Int, total: Int) {
-    val animated by animateFloatAsState(
-        targetValue = if (total > 0) done.toFloat() / total else 0f,
-        label = "ring",
-    )
-    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(64.dp)) {
-        Canvas(modifier = Modifier.size(64.dp)) {
-            val stroke = Stroke(width = 7.dp.toPx())
-            drawArc(color = CardWhite, startAngle = 0f, sweepAngle = 360f, useCenter = false, style = stroke)
-            drawArc(
-                color = Leaf,
-                startAngle = -90f,
-                sweepAngle = 360f * animated,
-                useCenter = false,
-                style = stroke,
-            )
-        }
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+private fun KadieSection(done: Int, total: Int) {
+    val mood = when {
+        total == 0 -> KadieMood.SLEEP
+        done >= total -> KadieMood.HAPPY
+        else -> KadieMood.IDLE
+    }
+    val (headline, subline) = when (mood) {
+        KadieMood.HAPPY -> "All clear!" to "Kadie is proud of you."
+        KadieMood.IDLE -> "Keep going" to "Kadie is watching your progress."
+        KadieMood.SLEEP -> "Quiet day" to "Kadie is recharging."
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        KadiePod(
+            mood = mood,
+            done = done,
+            total = total,
+            modifier = Modifier.size(124.dp),
+        )
+        Spacer(Modifier.width(16.dp))
+        Column {
             Text(
-                "$done/$total",
+                headline,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = Ink,
-                style = MaterialTheme.typography.titleSmall,
             )
-            Text("done", color = Faint, style = MaterialTheme.typography.labelSmall)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "$done of $total done today",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = Leaf,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                subline,
+                style = MaterialTheme.typography.bodySmall,
+                color = Faint,
+            )
         }
     }
 }
@@ -396,21 +386,21 @@ private fun EmptyState() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 56.dp),
+            .padding(top = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
             modifier = Modifier
-                .size(96.dp)
+                .size(88.dp)
                 .clip(CircleShape)
                 .background(Mist),
             contentAlignment = Alignment.Center,
         ) {
-            Kadie(mood = KadieMood.SLEEP, modifier = Modifier.size(56.dp))
+            Kadie(mood = KadieMood.SLEEP, modifier = Modifier.size(52.dp))
         }
         Spacer(Modifier.height(18.dp))
         Text(
-            "A quiet day",
+            "Nothing scheduled",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = Ink,
@@ -421,192 +411,5 @@ private fun EmptyState() {
             color = Faint,
             style = MaterialTheme.typography.bodyMedium,
         )
-    }
-}
-
-@Composable
-private fun CircleCheckbox(checked: Boolean, accent: Color = Leaf, onClick: () -> Unit) {
-    val haptics = LocalHapticFeedback.current
-    Box(
-        modifier = Modifier
-            .size(28.dp)
-            .clip(CircleShape)
-            .background(if (checked) accent else Color.Transparent)
-            .clickable {
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                onClick()
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        Canvas(modifier = Modifier.size(28.dp)) {
-            if (!checked) {
-                drawCircle(
-                    color = TeaMist,
-                    radius = size.minDimension / 2 - 1.dp.toPx(),
-                    style = Stroke(width = 2.dp.toPx()),
-                )
-            }
-        }
-        if (checked) {
-            Canvas(modifier = Modifier.size(12.dp)) {
-                val w = size.width
-                val h = size.height
-                drawLine(
-                    Color.White,
-                    Offset(w * 0.15f, h * 0.55f),
-                    Offset(w * 0.42f, h * 0.8f),
-                    strokeWidth = 2.dp.toPx(),
-                )
-                drawLine(
-                    Color.White,
-                    Offset(w * 0.42f, h * 0.8f),
-                    Offset(w * 0.88f, h * 0.18f),
-                    strokeWidth = 2.dp.toPx(),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun HabitCard(item: TodayItem.Habit, onToggle: () -> Unit, onEdit: () -> Unit) {
-    Card(
-        shape = cardShape,
-        colors = CardDefaults.cardColors(
-            containerColor = if (item.done) SageDone else CardWhite,
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onEdit),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    item.habit.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Ink,
-                )
-                Text("Habit", style = MaterialTheme.typography.labelMedium, color = Faint)
-            }
-            CircleCheckbox(checked = item.done, onClick = onToggle)
-        }
-    }
-}
-
-@Composable
-private fun RoutineCard(
-    item: TodayItem.Routine,
-    onToggleStep: (Int, Boolean) -> Unit,
-    onEdit: () -> Unit,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val allDone = item.steps.isNotEmpty() && item.doneSteps.containsAll(item.steps.indices.toList())
-    Card(
-        shape = cardShape,
-        colors = CardDefaults.cardColors(
-            containerColor = if (allDone) Bamboo else CardWhite,
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        item.routine.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Ink,
-                    )
-                    Text(
-                        "Routine - ${item.doneSteps.count { it in item.steps.indices }}/${item.steps.size} steps",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Faint,
-                    )
-                }
-                Icon(
-                    if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = Faint,
-                )
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    "Edit",
-                    color = Leaf,
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier
-                        .clickable(onClick = onEdit)
-                        .padding(4.dp),
-                )
-            }
-            AnimatedVisibility(visible = expanded) {
-                Column(modifier = Modifier.padding(top = 12.dp)) {
-                    item.steps.forEachIndexed { index, step ->
-                        val stepDone = item.doneSteps.contains(index)
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                        ) {
-                            CircleCheckbox(
-                                checked = stepDone,
-                                accent = Forest,
-                                onClick = { onToggleStep(index, !stepDone) },
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Text(
-                                step,
-                                color = if (stepDone) Faint else Ink,
-                                textDecoration = if (stepDone) TextDecoration.LineThrough else null,
-                                style = MaterialTheme.typography.bodyLarge,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TaskCard(item: TodayItem.Task, onToggle: () -> Unit, onEdit: () -> Unit) {
-    val priorityColor = when (item.task.priority) {
-        "HIGH" -> Matcha
-        "NORMAL" -> Bamboo
-        else -> TeaMist
-    }
-    Card(
-        shape = cardShape,
-        colors = CardDefaults.cardColors(containerColor = CardWhite),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onEdit),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(priorityColor),
-            )
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    item.task.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (item.task.done) Faint else Ink,
-                    textDecoration = if (item.task.done) TextDecoration.LineThrough else null,
-                )
-                Text("Task", style = MaterialTheme.typography.labelMedium, color = Faint)
-            }
-            CircleCheckbox(checked = item.task.done, onClick = onToggle)
-        }
     }
 }

@@ -1,5 +1,6 @@
 package com.cadence.app.ui.today
 
+import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -35,11 +37,14 @@ import com.cadence.app.ui.theme.Ink
 import com.cadence.app.ui.theme.Leaf
 import com.cadence.app.ui.theme.Mist
 import com.cadence.app.ui.theme.Paper
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 @Composable
 fun ItemEditorDialog(
     initial: EditorState?,
+    defaultDate: Long,
     onDismiss: () -> Unit,
     onSave: (EditorState) -> Unit,
     onDelete: (EditorState) -> Unit,
@@ -51,6 +56,11 @@ fun ItemEditorDialog(
     var priority by remember { mutableStateOf(initial?.priority ?: "NORMAL") }
     var steps by remember { mutableStateOf(initial?.steps ?: "") }
     var reminderMin by remember { mutableIntStateOf(initial?.reminderMin ?: -1) }
+    var dateEpoch by remember {
+        mutableLongStateOf(
+            if (initial != null && initial.date > 0) initial.date else defaultDate,
+        )
+    }
     val context = LocalContext.current
 
     AlertDialog(
@@ -59,7 +69,7 @@ fun ItemEditorDialog(
         shape = RoundedCornerShape(24.dp),
         title = {
             Text(
-                if (initial == null) "Add to today" else "Edit",
+                if (initial == null) "Add item" else "Edit",
                 fontWeight = FontWeight.Bold,
                 color = Ink,
             )
@@ -88,6 +98,21 @@ fun ItemEditorDialog(
                         options = listOf("LOW", "NORMAL", "HIGH"),
                         selected = priority,
                         onSelect = { priority = it },
+                    )
+                    DateRow(
+                        dateEpoch = dateEpoch,
+                        onPick = {
+                            val d = LocalDate.ofEpochDay(dateEpoch)
+                            DatePickerDialog(
+                                context,
+                                { _, year, month, day ->
+                                    dateEpoch = LocalDate.of(year, month + 1, day).toEpochDay()
+                                },
+                                d.year,
+                                d.monthValue - 1,
+                                d.dayOfMonth,
+                            ).show()
+                        },
                     )
                 } else {
                     ChipRow(
@@ -155,7 +180,7 @@ fun ItemEditorDialog(
                                 priority = priority,
                                 steps = steps,
                                 reminderMin = reminderMin,
-                                date = initial?.date ?: 0,
+                                date = dateEpoch,
                                 done = initial?.done ?: false,
                             ),
                         )
@@ -172,6 +197,32 @@ fun ItemEditorDialog(
             }
         },
     )
+}
+
+@Composable
+private fun DateRow(dateEpoch: Long, onPick: () -> Unit) {
+    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+        Text("Date", style = MaterialTheme.typography.labelMedium, color = Faint)
+        Spacer(Modifier.height(6.dp))
+        FilterChip(
+            selected = true,
+            onClick = onPick,
+            label = {
+                Text(
+                    LocalDate.ofEpochDay(dateEpoch).format(
+                        DateTimeFormatter.ofPattern("EEE, MMM d", Locale.getDefault()),
+                    ),
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            },
+            colors = FilterChipDefaults.filterChipColors(
+                containerColor = CardWhite,
+                labelColor = Faint,
+                selectedContainerColor = Mist,
+                selectedLabelColor = Ink,
+            ),
+        )
+    }
 }
 
 @Composable

@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.cadence.app.ui.plan.PlanScreen
 import com.cadence.app.ui.theme.Faint
 import com.cadence.app.ui.theme.Ink
 import com.cadence.app.ui.theme.Leaf
@@ -37,7 +38,7 @@ private data class Tab(val label: String, val icon: ImageVector, val placeholder
 fun CadenceRoot() {
     val tabs = listOf(
         Tab("Today", Icons.Outlined.CheckCircle, null),
-        Tab("Plan", Icons.Outlined.DateRange, "Planner arrives in T4"),
+        Tab("Plan", Icons.Outlined.DateRange, null),
         Tab("Notes", Icons.Outlined.Edit, "Notes arrive in T6"),
         Tab("Stats", Icons.Outlined.Star, "Insights arrive in T5"),
     )
@@ -65,17 +66,17 @@ fun CadenceRoot() {
         },
     ) { padding ->
         val tab = tabs[selected]
-        if (tab.placeholder == null) {
-            TodayScreen(modifier = Modifier.padding(padding))
-        } else {
-            Box(
+        when {
+            selected == 0 -> TodayScreen(modifier = Modifier.padding(padding))
+            selected == 1 -> PlanScreen(modifier = Modifier.padding(padding))
+            else -> Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = tab.placeholder,
+                    text = tab.placeholder ?: "",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Medium,
                     color = Faint,
