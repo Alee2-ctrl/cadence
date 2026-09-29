@@ -1,11 +1,12 @@
 package com.cadence.app.ui.plan
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -14,9 +15,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
@@ -39,24 +42,29 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.platform.LocalContext
 import com.cadence.app.ui.EditorState
 import com.cadence.app.ui.TodayItem
-import com.cadence.app.ui.components.HabitCard
-import com.cadence.app.ui.components.RoutineCard
-import com.cadence.app.ui.components.TaskCard
+import com.cadence.app.ui.components.CadenceSheet
+import com.cadence.app.ui.components.ItemActionsSheet
+import com.cadence.app.ui.components.SheetPillButton
 import com.cadence.app.ui.theme.CardWhite
 import com.cadence.app.ui.theme.Faint
 import com.cadence.app.ui.theme.Forest
+import com.cadence.app.ui.theme.Honey
 import com.cadence.app.ui.theme.Ink
 import com.cadence.app.ui.theme.Leaf
 import com.cadence.app.ui.theme.Matcha
 import com.cadence.app.ui.theme.Mist
 import com.cadence.app.ui.theme.Paper
+import com.cadence.app.ui.theme.SkyBlue
 import com.cadence.app.ui.today.ItemEditorDialog
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -74,6 +82,8 @@ fun PlanScreen(modifier: Modifier = Modifier) {
     val monthTaskDays by vm.monthTaskDays.collectAsState()
     var editing by remember { mutableStateOf<EditorState?>(null) }
     var showEditor by remember { mutableStateOf(false) }
+    var showDaySheet by remember { mutableStateOf(false) }
+    var actionsFor by remember { mutableStateOf<TodayItem?>(null) }
 
     Scaffold(
         modifier = modifier,
@@ -93,7 +103,8 @@ fun PlanScreen(modifier: Modifier = Modifier) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = 20.dp)
+                .verticalScroll(rememberScrollState()),
         ) {
             Row(
                 modifier = Modifier
@@ -163,72 +174,73 @@ fun PlanScreen(modifier: Modifier = Modifier) {
                     month = selectedDate,
                     selected = selectedDate,
                     taskDays = monthTaskDays,
-                    onSelect = { vm.select(it) },
+                    onSelect = { vm.select(it); showDaySheet = true },
                 )
             } else {
                 WeekRow(
                     weekStart = weekStart,
                     selected = selectedDate,
                     taskDays = weekTaskDays,
-                    onSelect = { vm.select(it) },
+                    onSelect = { vm.select(it); showDaySheet = true },
                 )
             }
 
+            Spacer(Modifier.height(28.dp))
             Text(
-                selectedDate.format(DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.getDefault())),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
+                "Tap a day to see what's planned.",
+                style = MaterialTheme.typography.bodyMedium,
                 color = Faint,
-                modifier = Modifier.padding(top = 18.dp, bottom = 10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 40.dp),
+                textAlign = TextAlign.Center,
             )
-
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 110.dp),
-            ) {
-                if (items.isEmpty()) {
-                    item {
-                        Text(
-                            "Nothing on this day.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Faint,
-                            modifier = Modifier.padding(top = 24.dp),
-                        )
-                    }
-                }
-                items(
-                    items,
-                    key = {
-                        when (it) {
-                            is TodayItem.Habit -> "h" + it.habit.id
-                            is TodayItem.Routine -> "r" + it.routine.id
-                            is TodayItem.Task -> "t" + it.task.id
-                        }
-                    },
-                ) { item ->
-                    when (item) {
-                        is TodayItem.Habit -> HabitCard(
-                            item = item,
-                            onToggle = { vm.toggleHabit(item.habit.id, !item.done) },
-                            onEdit = { editing = EditorState.from(item); showEditor = true },
-                        )
-                        is TodayItem.Routine -> RoutineCard(
-                            item = item,
-                            onToggleStep = { idx, done ->
-                                vm.toggleRoutineStep(item.routine.id, idx, done, item.doneSteps)
-                            },
-                            onEdit = { editing = EditorState.from(item); showEditor = true },
-                        )
-                        is TodayItem.Task -> TaskCard(
-                            item = item,
-                            onToggle = { vm.toggleTask(item.task) },
-                            onEdit = { editing = EditorState.from(item); showEditor = true },
-                        )
-                    }
-                    Spacer(Modifier.height(10.dp))
-                }
-            }
         }
+    }
+
+    if (showDaySheet) {
+        DaySheet(
+            date = selectedDate,
+            items = items,
+            onDismiss = { showDaySheet = false },
+            onAdd = {
+                showDaySheet = false
+                editing = null
+                showEditor = true
+            },
+            onEditItem = { item ->
+                showDaySheet = false
+                editing = EditorState.from(item)
+                showEditor = true
+            },
+            onLongPressItem = { item -> actionsFor = item },
+        )
+    }
+
+    actionsFor?.let { item ->
+        ItemActionsSheet(
+            name = when (item) {
+                is TodayItem.Habit -> item.habit.name
+                is TodayItem.Routine -> item.routine.name
+                is TodayItem.Task -> item.task.title
+            },
+            kind = when (item) {
+                is TodayItem.Habit -> "Habit"
+                is TodayItem.Routine -> "Routine"
+                is TodayItem.Task -> "Task"
+            },
+            onEdit = {
+                editing = EditorState.from(item)
+                actionsFor = null
+                showDaySheet = false
+                showEditor = true
+            },
+            onDelete = {
+                vm.delete(EditorState.from(item))
+                actionsFor = null
+            },
+            onDismiss = { actionsFor = null },
+        )
     }
 
     if (showEditor) {
@@ -241,6 +253,93 @@ fun PlanScreen(modifier: Modifier = Modifier) {
         )
     }
 }
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun DaySheet(
+    date: LocalDate,
+    items: List<TodayItem>,
+    onDismiss: () -> Unit,
+    onAdd: () -> Unit,
+    onEditItem: (TodayItem) -> Unit,
+    onLongPressItem: (TodayItem) -> Unit,
+) {
+    val haptics = LocalHapticFeedback.current
+    val isToday = date == LocalDate.now()
+    CadenceSheet(
+        onDismiss = onDismiss,
+        label = date.format(DateTimeFormatter.ofPattern("EEEE, MMM d", Locale.getDefault())),
+        title = if (items.isEmpty()) {
+            if (isToday) "Planning something for today?" else "Planning something for this day?"
+        } else {
+            if (isToday) "Today's plan" else "Planned for this day"
+        },
+        subtitle = if (items.isEmpty()) "Nothing here yet. Start with one small thing."
+        else "${items.size} item" + (if (items.size == 1) "" else "s"),
+    ) {
+        Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+            items.forEach { item ->
+                val (name, kind, accent, done) = when (item) {
+                    is TodayItem.Habit -> Quad(item.habit.name, "Habit", Leaf, item.done)
+                    is TodayItem.Routine -> Quad(
+                        item.routine.name,
+                        "Routine",
+                        Honey,
+                        item.steps.isNotEmpty() &&
+                            item.doneSteps.containsAll(item.steps.indices.toList()),
+                    )
+                    is TodayItem.Task -> Quad(item.task.title, "Task", SkyBlue, item.task.done)
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(CardWhite)
+                        .combinedClickable(
+                            onClick = { onEditItem(item) },
+                            onLongClick = {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onLongPressItem(item)
+                            },
+                        )
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(accent),
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            name,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (done) Faint else Ink,
+                            textDecoration = if (done) TextDecoration.LineThrough else null,
+                        )
+                        Text(
+                            kind + if (done) " - done" else "",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = accent,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+            SheetPillButton(
+                text = if (items.isEmpty()) "Plan something" else "Add another",
+                onClick = onAdd,
+            )
+        }
+    }
+}
+
+private data class Quad(val name: String, val kind: String, val accent: Color, val done: Boolean)
 
 @Composable
 private fun WeekRow(
