@@ -99,3 +99,45 @@ interface ReviewDao {
     @Query("SELECT * FROM reviews")
     suspend fun allOnce(): List<ReviewEntity>
 }
+
+@Dao
+interface NoteDao {
+    @Query("SELECT * FROM notes ORDER BY pinned DESC, updatedAt DESC")
+    fun all(): Flow<List<NoteEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(note: NoteEntity): Long
+
+    @Query("DELETE FROM notes WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    @Query("SELECT * FROM notes")
+    suspend fun allOnce(): List<NoteEntity>
+}
+
+@Dao
+interface ModeDao {
+    @Query("SELECT * FROM modes ORDER BY createdAt")
+    fun all(): Flow<List<ModeEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(mode: ModeEntity): Long
+
+    @Query("DELETE FROM modes WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    @Query("SELECT * FROM modes")
+    suspend fun allOnce(): List<ModeEntity>
+}
+
+@Dao
+interface LockoutDao {
+    @Query("SELECT * FROM lockout WHERE id = 1")
+    fun get(): Flow<LockoutEntity?>
+
+    @Query("SELECT * FROM lockout WHERE id = 1")
+    suspend fun once(): LockoutEntity?
+
+    @Upsert
+    suspend fun upsert(lockout: LockoutEntity)
+}
