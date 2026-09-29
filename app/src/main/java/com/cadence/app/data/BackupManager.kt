@@ -9,7 +9,7 @@ object BackupManager {
 
     suspend fun export(context: Context, repo: CadenceRepository, uri: Uri): Int {
         val root = JSONObject()
-        root.put("version", 2)
+        root.put("version", 3)
 
         val habits = JSONArray()
         repo.allHabits().forEach { h ->
@@ -58,6 +58,14 @@ object BackupManager {
             })
         }
         root.put("tasks", tasks)
+
+        val reviews = JSONArray()
+        repo.allReviews().forEach { r ->
+            reviews.put(JSONObject().apply {
+                put("date", r.date); put("mood", r.mood); put("note", r.note)
+            })
+        }
+        root.put("reviews", reviews)
 
         context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use {
             it.write(root.toString())
@@ -150,6 +158,19 @@ object BackupManager {
                     )
                 )
                 count++
+            }
+        }
+
+        root.optJSONArray("reviews")?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                repo.upsertReview(
+                    ReviewEntity(
+                        date = o.getLong("date"),
+                        mood = o.optString("mood", ""),
+                        note = o.optString("note", "")
+                    )
+                )
             }
         }
 
