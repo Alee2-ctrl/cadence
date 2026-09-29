@@ -4,6 +4,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.cadence.app.data.CadenceDatabase
+import com.cadence.app.lockout.LockoutService
+import com.cadence.app.modes.ModesManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -14,7 +16,12 @@ class BootReceiver : BroadcastReceiver() {
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                ReminderScheduler.rescheduleAll(context, CadenceDatabase.get(context))
+                val db = CadenceDatabase.get(context)
+                ReminderScheduler.rescheduleAll(context, db)
+                val lockout = db.lockoutDao().once()
+                if (lockout?.enabled == true || ModesManager.isBlocklistForced(context)) {
+                    LockoutService.start(context)
+                }
             } finally {
                 pending.finish()
             }
