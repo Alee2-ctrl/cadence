@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cadence.app.ui.plan.PlanScreen
+import com.cadence.app.ui.stats.StatsScreen
 import com.cadence.app.ui.theme.Faint
 import com.cadence.app.ui.theme.Ink
 import com.cadence.app.ui.theme.Leaf
@@ -40,7 +41,7 @@ fun CadenceRoot() {
         Tab("Today", Icons.Outlined.CheckCircle, null),
         Tab("Plan", Icons.Outlined.DateRange, null),
         Tab("Notes", Icons.Outlined.Edit, "Notes arrive in T6"),
-        Tab("Stats", Icons.Outlined.Star, "Insights arrive in T5"),
+        Tab("Stats", Icons.Outlined.Star, null),
     )
     var selected by remember { mutableIntStateOf(0) }
 
@@ -69,6 +70,7 @@ fun CadenceRoot() {
         when {
             selected == 0 -> TodayScreen(modifier = Modifier.padding(padding))
             selected == 1 -> PlanScreen(modifier = Modifier.padding(padding))
+            selected == 3 -> StatsScreen(modifier = Modifier.padding(padding))
             else -> Box(
                 modifier = Modifier
                     .fillMaxSize()
