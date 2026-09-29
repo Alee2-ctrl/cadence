@@ -1,5 +1,7 @@
 package com.cadence.app.ui.today
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -23,13 +25,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -71,8 +77,17 @@ private val cardShape = RoundedCornerShape(24.dp)
 fun TodayScreen(modifier: Modifier = Modifier) {
     val vm: TodayViewModel = viewModel(factory = TodayViewModel.factory(LocalContext.current))
     val state by vm.state.collectAsState()
+    val backupStatus by vm.backupStatus.collectAsState()
     var editing by remember { mutableStateOf<EditorState?>(null) }
     var showEditor by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri -> uri?.let { vm.exportBackup(it) } }
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri -> uri?.let { vm.importBackup(it) } }
 
     Scaffold(
         modifier = modifier,
@@ -93,7 +108,7 @@ fun TodayScreen(modifier: Modifier = Modifier) {
                 .padding(padding),
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 96.dp),
         ) {
-            item { Header(state) }
+            item { Header(state, onSettings = { showSettings = true }) }
 
             if (state.items.isEmpty()) {
                 item { EmptyState() }
@@ -154,10 +169,44 @@ fun TodayScreen(modifier: Modifier = Modifier) {
             onDelete = { vm.delete(it); showEditor = false },
         )
     }
+
+    if (showSettings) {
+        AlertDialog(
+            onDismissRequest = { showSettings = false },
+            containerColor = Paper,
+            shape = RoundedCornerShape(24.dp),
+            title = { Text("Cadence - T2", fontWeight = FontWeight.Bold, color = Ink) },
+            text = {
+                Column {
+                    Text("Backup", style = MaterialTheme.typography.labelLarge, color = Faint)
+                    Spacer(Modifier.height(10.dp))
+                    TextButton(onClick = { exportLauncher.launch("cadence-backup.json") }) {
+                        Text("Export everything to a file", color = Clay, fontWeight = FontWeight.SemiBold)
+                    }
+                    TextButton(onClick = { importLauncher.launch(arrayOf("application/json")) }) {
+                        Text("Restore from a backup file", color = Ink, fontWeight = FontWeight.SemiBold)
+                    }
+                    backupStatus?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = Faint)
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    Text(
+                        "Reminders fire as system notifications and survive reboot. Set one from any item's edit dialog.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Faint,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSettings = false }) { Text("Close", color = Faint) }
+            },
+        )
+    }
 }
 
 @Composable
-private fun Header(state: TodayUiState) {
+private fun Header(state: TodayUiState, onSettings: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -177,6 +226,9 @@ private fun Header(state: TodayUiState) {
                 fontWeight = FontWeight.Bold,
                 color = Ink,
             )
+        }
+        IconButton(onClick = onSettings) {
+            Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = Faint)
         }
         ProgressRing(done = state.doneCount, total = state.totalCount)
     }
