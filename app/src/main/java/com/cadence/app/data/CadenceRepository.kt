@@ -6,6 +6,9 @@ class CadenceRepository(private val db: CadenceDatabase) {
 
     val habits: Flow<List<HabitEntity>> = db.habitDao().active()
     val routines: Flow<List<RoutineEntity>> = db.routineDao().active()
+    val notes: Flow<List<NoteEntity>> = db.noteDao().all()
+    val modes: Flow<List<ModeEntity>> = db.modeDao().all()
+    val lockout: Flow<LockoutEntity?> = db.lockoutDao().get()
 
     fun habitLogs(date: Long): Flow<List<HabitLogEntity>> = db.habitLogDao().forDate(date)
     fun routineLogs(date: Long): Flow<List<RoutineLogEntity>> = db.routineLogDao().forDate(date)
@@ -48,10 +51,16 @@ class CadenceRepository(private val db: CadenceDatabase) {
     suspend fun upsertHabitLog(log: HabitLogEntity) = db.habitLogDao().upsert(log)
     suspend fun upsertRoutineLog(log: RoutineLogEntity) = db.routineLogDao().upsert(log)
     suspend fun upsertReview(review: ReviewEntity) = db.reviewDao().upsert(review)
+    suspend fun upsertNote(note: NoteEntity): Long = db.noteDao().upsert(note)
+    suspend fun upsertMode(mode: ModeEntity): Long = db.modeDao().upsert(mode)
+    suspend fun upsertLockout(lockout: LockoutEntity) = db.lockoutDao().upsert(lockout)
+    suspend fun lockoutOnce(): LockoutEntity? = db.lockoutDao().once()
 
     suspend fun deleteHabit(id: Long) = db.habitDao().deleteById(id)
     suspend fun deleteRoutine(id: Long) = db.routineDao().deleteById(id)
     suspend fun deleteTask(id: Long) = db.taskDao().deleteById(id)
+    suspend fun deleteNote(id: Long) = db.noteDao().deleteById(id)
+    suspend fun deleteMode(id: Long) = db.modeDao().deleteById(id)
 
     suspend fun allHabits(): List<HabitEntity> = db.habitDao().allOnce()
     suspend fun allRoutines(): List<RoutineEntity> = db.routineDao().allOnce()
@@ -59,4 +68,6 @@ class CadenceRepository(private val db: CadenceDatabase) {
     suspend fun allHabitLogs(): List<HabitLogEntity> = db.habitLogDao().allOnce()
     suspend fun allRoutineLogs(): List<RoutineLogEntity> = db.routineLogDao().allOnce()
     suspend fun allReviews(): List<ReviewEntity> = db.reviewDao().allOnce()
+    suspend fun allNotes(): List<NoteEntity> = db.noteDao().allOnce()
+    suspend fun allModes(): List<ModeEntity> = db.modeDao().allOnce()
 }
